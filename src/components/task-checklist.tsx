@@ -16,5 +16,5 @@ function ChecklistStep({task,step}:{task:string;step:Detail["steps"][number]}) {
 }
 export function TaskChecklist({detail}:{detail:Detail}) {
   const completed=detail.steps.filter(step=>step.completed).length;
-  return <><p className="checklist-count">{completed} of {detail.steps.length} steps completed</p><progress aria-label="Checklist completion" value={completed} max={detail.steps.length||1}/><ol className="task-checklist">{detail.steps.map(step=><ChecklistStep key={step.id} task={detail.id} step={step}/>)}</ol><p className="field-hint">Progress saves when you change a checkbox. Completing steps does not submit or verify a pull request.</p></>;
+  return <><p className="checklist-count">{completed} of {detail.steps.length} steps completed</p><progress aria-label="Checklist completion" value={completed} max={detail.steps.length||1}/><ol className="task-checklist">{detail.steps.map(step=><ChecklistStep key={`${step.id}-${step.completed}`} task={detail.id} step={step}/>)}</ol><p className="field-hint">Progress saves when you change a checkbox. Completing steps does not submit or verify a pull request.</p></>;
 }

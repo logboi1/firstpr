@@ -31,8 +31,9 @@ test('published instructions, persistent independent checklists, archived access
   const second=page.getByRole('checkbox',{name:'Run the project tests',exact:true});
   await expect(first).not.toBeChecked();
   await first.focus(); await page.keyboard.press('Space');
-  await expect(first).toBeChecked();
+  await expect(page.locator('.form-error:visible')).toHaveCount(0);
   await expect(page.getByText('1 of 2 steps completed',{exact:true})).toBeVisible();
+  await expect(first).toBeChecked();
   await page.reload(); await expect(first).toBeChecked();
   const bobContext=await browser.newContext();
   const bob=await bobContext.newPage();
