@@ -95,6 +95,12 @@ Archived opportunities leave the visitor directory and cannot be edited. Partici
 
 `public.get_public_progress(page_size)` returns only `display_name`, `pr_url`, `status`, and `submitted_at`, filtered by current profile consent. It never returns emails, participant IDs, skills, blockers, mentor identities, or verifier details. The page size defaults to 50 and is clamped to 1–100. Revoking consent removes the user's rows from subsequent RPC calls. This initial RPC serves the recent board; pagination is a later UI concern.
 
+## Public opportunity directory
+
+`20261014223000_opportunity_directory.sql` adds `browse_opportunities(search_query, skill_filter, type_filter, difficulty_filter, page_number)`. It uses invoker security and a fixed empty search path, retains RLS, and explicitly selects only published opportunities for every caller. Execute permission is limited to `anon` and `authenticated` (plus the function owner); it has no write operations.
+
+The RPC returns a narrow card projection, total matching count, current page, page count, and skills from published tasks only. Filters combine with AND; search is a literal case-insensitive substring of title, summary, and skills. Skill matching is case-insensitive and exact after trimming. Pages contain at most 12 records, ordered by newest creation timestamp then ID. Out-of-range page numbers clamp to available pages. See `OPPORTUNITY-DIRECTORY.md` for the UI.
+
 ## Fictional fixtures
 
 `supabase/seed.sql` includes clearly labelled demo tasks and `example.invalid` links. Automatic seeding is disabled, so database reset does not publish fictional tasks by default. The automated tests load them into disposable databases. Apply the fixture manually only to a local disposable environment when needed. It contains no accounts, credentials, or real participant data.

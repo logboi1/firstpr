@@ -112,6 +112,43 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       assert.equal((await rows("select * from public.user_roles")).length, 0);
       await denied("select private.create_profile()");
     });
+    await suite.test("directory combines literal search and filters and hides nonpublic tasks for every role", async () => {
+      for (const name of [undefined, "alice", "mentor", "curator"]) {
+        await actor(name);
+        const browse = async (args = ["", "", "", "", 1]) => (await rows("select public.browse_opportunities($1,$2,$3,$4,$5) as result", args))[0].result;
+        const all = await browse();
+        assert.equal(all.total, 2);
+        assert.deepEqual(all.skills, ["Accessibility", "Markdown"]);
+        assert.ok(all.items.every(item => !item.title.includes("draft")));
+        assert.equal((await browse(["SETUP", "markdown", "documentation", "beginner", 1])).total, 1);
+        assert.equal((await browse(["setup", "Markdown", "testing", "beginner", 1])).total, 0);
+        for (const search of ["Unreviewed", "%", "_", "') OR true --"]) {
+          assert.equal((await browse([search, "", "", "", 1])).total, 0);
+        }
+        assert.equal((await browse(["", "TypeScript", "", "", 1])).total, 0);
+        assert.equal((await browse(["", "", "", "", -1])).page, 1);
+        assert.ok(!("created_by" in all.items[0]));
+      }
+      await admin();
+    });
+    await suite.test("directory pagination is bounded, stable, and never includes archived tasks", async () => {
+      await admin();
+      await db.exec(`insert into public.opportunities(title,summary,skills,contribution_type,repository_url,issue_url,setup_notes,status)
+        select '[PAGE TEST] Task ' || n, 'Pagination fixture', ARRAY['C++'], 'code',
+          'https://example.invalid/page', 'https://example.invalid/page/issues/' || n,
+          'Fictional setup instructions', case when n=15 then 'archived'::public.opportunity_status else 'published'::public.opportunity_status end
+        from generate_series(1,15) n;`);
+      await actor();
+      const browse = async page => (await rows("select public.browse_opportunities('[PAGE TEST]','C++','code','beginner',$1) as result", [page]))[0].result;
+      const first = await browse(1), second = await browse(2);
+      assert.equal(first.total, 14); assert.equal(first.pages, 2); assert.equal(first.items.length, 12);
+      assert.equal(second.items.length, 2);
+      assert.equal(new Set([...first.items, ...second.items].map(item => item.id)).size, 14);
+      assert.deepEqual((await browse(1)).items, first.items);
+      assert.deepEqual((await browse(999999)).items, second.items);
+      await admin();
+      await db.exec("delete from public.opportunities where title like '[PAGE TEST]%'");
+    });
     await suite.test("participants and mentors cannot edit opportunities", async () => {
       for (const name of ["alice", "mentor"]) {
         await actor(name);
