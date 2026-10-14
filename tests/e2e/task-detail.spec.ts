@@ -34,6 +34,7 @@ test('published instructions, persistent independent checklists, archived access
   await expect(page.locator('.form-error:visible')).toHaveCount(0);
   await expect(page.getByText('1 of 2 steps completed',{exact:true})).toBeVisible();
   await expect(first).toBeChecked();
+  await expect(first).toBeFocused();
   await page.reload(); await expect(first).toBeChecked();
   const bobContext=await browser.newContext();
   const bob=await bobContext.newPage();
