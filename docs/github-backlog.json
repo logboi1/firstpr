@@ -1,0 +1,50 @@
+[
+  {
+    "title": "01 — Repository foundation",
+    "body": "Create the Next.js TypeScript app, scripts, ignored environment files, README, MIT license, CONTRIBUTING guide, issue templates, and PR template. Add CI for lint, type checking, and production build. Document setup from a clean clone.\n\nAcceptance: a new contributor can install dependencies and run the app following the README; no secrets are committed; required checks pass.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  },
+  {
+    "title": "02 — Schema, migrations, and access policies",
+    "body": "Implement the data model, migrations, and sample fictional data. Add row-level security policies and a controlled role bootstrap process.\n\nAcceptance: visitors cannot read drafts or help requests; participants cannot access another user's private records or change roles; mentors cannot edit opportunities; curators can manage opportunities. Verify allowed and denied operations with representative accounts.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  },
+  {
+    "title": "03 — Authentication and onboarding",
+    "body": "Implement sign-in, sign-out, profile creation, protected routes, and display name/skills/experience editing.\n\nAcceptance: refresh preserves the session; unauthenticated mutations fail; returning users reach their dashboard; users cannot edit another profile.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  },
+  {
+    "title": "04 — Opportunity directory",
+    "body": "Implement published task cards, search, filters, empty states, loading states, and error recovery.\n\nAcceptance: combining filters produces the expected results; drafts stay hidden; the page works on mobile and with keyboard navigation.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  },
+  {
+    "title": "05 — Opportunity detail and checklist",
+    "body": "Show prerequisites, setup instructions, repository/issue links, and ordered checklist steps. Persist progress per signed-in participant.\n\nAcceptance: progress survives refresh; another participant's checklist remains independent; an archived task can no longer be selected as a new opportunity.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  },
+  {
+    "title": "06 — Curator opportunity management",
+    "body": "Build create/edit forms, checklist editing, publishing, and archiving. Validate fields and external URLs.\n\nAcceptance: only curators can mutate opportunities; incomplete drafts cannot be published; archived opportunities disappear from the public directory.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  },
+  {
+    "title": "07 — Participant help requests",
+    "body": "Allow a participant to describe a blocker for an opportunity and view or cancel their requests.\n\nAcceptance: the blocker is required; participants see only their own private requests; resolved or cancelled requests cannot be claimed.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  },
+  {
+    "title": "08 — Mentor queue and claims",
+    "body": "Add queue filters, atomic claims, release, and resolution for assigned mentors.\n\nAcceptance: if two mentors claim simultaneously, only one succeeds; participants cannot claim requests; mentors cannot resolve another mentor's assigned request.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  },
+  {
+    "title": "09 — Pull-request submission and verification",
+    "body": "Accept canonical GitHub PR links with inline validation. Record submitted status. Let curators verify merged or closed status against GitHub manually.\n\nAcceptance: invalid links and duplicates are rejected; participants cannot mark their own PR merged; verification records the curator and timestamp. No external status is implied to be automatically synchronized.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  },
+  {
+    "title": "10 — Participant dashboard and public progress",
+    "body": "Show personal active tasks, checklist progress, help status, and contribution status. Build an opt-in public board with separate submitted and merged counts.\n\nAcceptance: the board exposes no email address or blocker text; opting out removes the participant's public entries; counts reflect the stored statuses correctly. Avoid competitive rankings that reward trivial submissions.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  },
+  {
+    "title": "11 — End-to-end validation and accessibility",
+    "body": "Validate the real journey: sign in → choose a task → update checklist → request help → mentor claims/resolves → submit PR → curator verifies → board updates. Cover role boundaries, claim races, failures, and mobile layouts.\n\nAcceptance: core workflow succeeds, authorization checks reject forbidden actions, forms have labels, keyboard focus is visible, and meaningful errors explain recovery.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  },
+  {
+    "title": "12 — Pilot preparation and release",
+    "body": "Curate a small set of real opportunities after checking contribution guidelines, setup requirements, and current issue availability. Use fictional fixtures before this review. Invite a small pilot only when the core workflow passes validation.\n\nAcceptance: README accurately describes implemented features, known limitations are documented, a newcomer can complete the flow, mentors can use the queue, and the demo uses no real private data. Publish a group announcement only after the user requests it.\n\nPart of the FirstPR MVP v0.1 backlog.\n\nSee `docs/MVP-PLAN.md` for the product scope and delivery sequence."
+  }
+]
