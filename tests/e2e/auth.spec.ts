@@ -5,17 +5,17 @@ test('email sign-in, onboarding, refresh, own profile editing, logout and stale 
     await page.goto(route);
     await expect(page).toHaveURL(/\/sign-in$/);
   }
-  await page.getByLabel('Email address').fill('ada@example.com');
+  await page.getByLabel('Email address', {exact:true}).fill('ada@example.com');
   await page.getByRole('button', {name:'Send sign-in code'}).click();
-  await page.getByLabel('Email code').fill('00000000');
+  await page.getByLabel('Email code', {exact:true}).fill('00000000');
   await page.getByRole('button', {name:'Verify and continue'}).click();
   await expect(page.locator('.form-error:visible')).toContainText('invalid or expired');
-  await page.getByLabel('Email code').fill('12345678');
+  await page.getByLabel('Email code', {exact:true}).fill('12345678');
   await page.getByRole('button', {name:'Verify and continue'}).click();
   await expect(page).toHaveURL(/\/onboarding$/);
-  await page.getByLabel('Display name').fill('Ada');
-  await page.getByLabel('Skills and interests').fill('React, documentation, React');
-  await page.getByLabel('Experience level').selectOption('intermediate');
+  await page.getByLabel('Display name', {exact:true}).fill('Ada');
+  await page.getByLabel('Skills and interests', {exact:true}).fill('React, documentation, React');
+  await page.getByLabel('Experience level', {exact:true}).selectOption('intermediate');
   await page.getByRole('button', {name:'Save and continue'}).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('heading', {name:'Welcome, Ada.'})).toBeVisible();
@@ -27,7 +27,7 @@ test('email sign-in, onboarding, refresh, own profile editing, logout and stale 
   await page.goto('/onboarding');
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.getByRole('link', {name:'Edit profile',exact:true}).click();
-  await page.getByLabel('Display name').fill('Ada Updated');
+  await page.getByLabel('Display name', {exact:true}).fill('Ada Updated');
   // Forged owner/role fields must not change the authenticated mutation target.
   await page.locator('form').first().evaluate(form => {
     for (const [name,value] of [['id','another-user'],['role','curator']]) {
@@ -41,7 +41,7 @@ test('email sign-in, onboarding, refresh, own profile editing, logout and stale 
   await other.goto('/dashboard');
   await other.getByRole('button', {name:'Sign out',exact:true}).click();
   await expect(other).toHaveURL(/\/sign-in$/);
-  await page.getByLabel('Display name').fill('Unauthorized edit');
+  await page.getByLabel('Display name', {exact:true}).fill('Unauthorized edit');
   await page.getByRole('button', {name:'Save and continue'}).click();
   await expect(page.locator('.form-error:visible')).toContainText('session has expired');
   await page.goto('/dashboard');
@@ -49,9 +49,9 @@ test('email sign-in, onboarding, refresh, own profile editing, logout and stale 
 });
 test('expired cookie session is refreshed and persisted on the response', async ({ page, context, request }) => {
   await page.goto('/sign-in');
-  await page.getByLabel('Email address').fill('ada@example.com');
+  await page.getByLabel('Email address', {exact:true}).fill('ada@example.com');
   await page.getByRole('button', {name:'Send sign-in code'}).click();
-  await page.getByLabel('Email code').fill('12345678');
+  await page.getByLabel('Email code', {exact:true}).fill('12345678');
   await page.getByRole('button', {name:'Verify and continue'}).click();
   await expect(page).toHaveURL(/\/onboarding$/);
   const cookies = await context.cookies();
