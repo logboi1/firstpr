@@ -160,7 +160,7 @@ First implementation task after repository access: task 01, followed by task 02.
 
 ## Current implementation status
 
-The foundation adds a Next.js landing page, a 404 page, development scripts, CI, contribution templates, and this plan. The initial database migration and authorization tests are implemented; see `docs/DATABASE.md`. Authentication integration, hosted database setup, task browsing, checklists, mentor support, and contribution tracking UI are not implemented yet.
+The foundation adds a Next.js landing page, a 404 page, development scripts, CI, contribution templates, and this plan. The initial database migration and authorization tests are implemented; see `docs/DATABASE.md`. Authentication integration, onboarding, and own-profile editing are implemented. Hosted database setup, task browsing, checklists, mentor support, and contribution tracking UI remain pending.
 
 The landing page describes planned behavior and links to GitHub. It does not contain sample opportunities presented as real ones. No production database or hosted deployment is configured.
 
