@@ -9,7 +9,7 @@ test('email sign-in, onboarding, refresh, own profile editing, logout and stale 
   await page.getByRole('button', {name:'Send sign-in code'}).click();
   await page.getByLabel('Email code').fill('00000000');
   await page.getByRole('button', {name:'Verify and continue'}).click();
-  await expect(page.getByRole('alert')).toContainText('invalid or expired');
+  await expect(page.locator('.form-error')).toContainText('invalid or expired');
   await page.getByLabel('Email code').fill('12345678');
   await page.getByRole('button', {name:'Verify and continue'}).click();
   await expect(page).toHaveURL(/\/onboarding$/);
@@ -43,7 +43,7 @@ test('email sign-in, onboarding, refresh, own profile editing, logout and stale 
   await expect(other).toHaveURL(/\/sign-in$/);
   await page.getByLabel('Display name').fill('Unauthorized edit');
   await page.getByRole('button', {name:'Save and continue'}).click();
-  await expect(page.getByRole('alert')).toContainText('session has expired');
+  await expect(page.locator('.form-error')).toContainText('session has expired');
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/sign-in$/);
 });
