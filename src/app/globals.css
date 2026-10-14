@@ -80,3 +80,43 @@ button:disabled { opacity: .6; cursor: wait; }
 .profile-summary { display: grid; gap: 8px; margin-block: 28px; }
 .profile-summary dt { font-weight: 700; margin-top: 12px; }
 .profile-summary dd { margin: 0; overflow-wrap: anywhere; }
+
+.directory-main { padding-block: 48px 72px; }
+.directory-heading { max-width: 760px; margin-bottom: 32px; }
+.directory-heading h1 { font-size: clamp(38px, 5vw, 60px); letter-spacing: -.055em; }
+.directory-heading > p:last-child { color: var(--muted); line-height: 1.8; }
+.directory-filters { display: grid; grid-template-columns: 2fr 1fr 1.3fr 1fr; gap: 16px; background: #edf1e5; padding: 24px; border: 1px solid #dce3d6; border-radius: 12px; }
+.directory-filters > div { min-width: 0; }
+.directory-filters label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.directory-filters input, .directory-filters select { width: 100%; padding: 12px; min-height: 44px; border: 1px solid #8d9c88; border-radius: 6px; background: white; color: var(--ink); font-size: 14px; }
+.filter-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 20px; }
+.clear-filters { font-size: 13px; text-decoration: underline; }
+.results-heading { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-block: 24px; }
+.results-heading p:first-child { font-weight: 700; }
+.results-heading p:last-child { font-size: 12px; color: var(--muted); }
+.opportunity-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.opportunity-card { display: flex; flex-direction: column; padding: 24px; background: white; border: 1px solid #dce3d6; border-radius: 12px; min-width: 0; overflow-wrap: anywhere; }
+.opportunity-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; color: #52614c; flex-wrap: wrap; }
+.difficulty { padding: 6px 9px; border-radius: 5px; background: #edf1e5; }
+.difficulty-intermediate { background: #fff1d6; color: #71521f; }
+.difficulty-advanced { background: #eeeafa; color: #55417a; }
+.opportunity-card h2 { font-size: 22px; font-weight: 700; letter-spacing: -.035em; line-height: 1.35; margin-block: 22px 12px; }
+.opportunity-summary { font-size: 14px; color: var(--muted); line-height: 1.75; margin: 0 0 20px; }
+.skill-tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 0 0 24px; }
+.skill-tags li { font-size: 12px; padding: 6px 9px; background: #f2f4ed; border-radius: 5px; }
+.opportunity-links { display: grid; gap: 16px; margin-top: auto; }
+.repository-name { font-size: 12px; color: #42634e; text-decoration: underline; line-height: 1.5; }
+.directory-state { text-align: center; padding: 56px 24px; background: #f0f3e9; border: 1px dashed #bccab5; border-radius: 12px; }
+.directory-state h2 { font-size: 26px; font-weight: 700; letter-spacing: -.03em; }
+.directory-state p { max-width: 580px; margin: 16px auto 24px; line-height: 1.8; color: var(--muted); }
+.directory-state .actions { justify-content: center; }
+.empty-icon { font-size: 44px; color: #477258; }
+.directory-pagination { justify-content: space-between; margin-block: 32px; }
+.directory-footnote { font-size: 13px; line-height: 1.8; color: var(--muted); margin-top: 32px; }
+.skeleton-card { min-height: 280px; gap: 20px; }
+.skeleton-line { height: 22px; border-radius: 5px; background: #edf1e5; }
+.skeleton-line:nth-child(2) { height: 60px; }
+.skeleton-line:nth-child(3) { width: 60%; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #a15c12; outline-offset: 4px; }
+@media (max-width: 1000px) { .opportunity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .directory-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .directory-main { padding-block: 32px 48px; } .opportunity-grid, .directory-filters { grid-template-columns: 1fr; } .directory-filters { padding: 20px; } .directory-header { flex-wrap: wrap; padding-block: 20px; } .results-heading { align-items: start; flex-direction: column; gap: 0; } .opportunity-card { padding: 22px; } .directory-pagination { gap: 12px; flex-wrap: wrap; } .directory-state { padding: 32px 20px; } }

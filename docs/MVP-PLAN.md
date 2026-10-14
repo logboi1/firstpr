@@ -1,6 +1,6 @@
 # FirstPR — MVP project plan
 
-Status: Repository created. Foundation implementation prepared; application features remain in the backlog.
+Status: Foundation, database, authentication, and public opportunity directory implemented. Remaining MVP workflows are in the backlog.
 
 ## Purpose
 
@@ -160,7 +160,7 @@ First implementation task after repository access: task 01, followed by task 02.
 
 ## Current implementation status
 
-The foundation adds a Next.js landing page, a 404 page, development scripts, CI, contribution templates, and this plan. The initial database migration and authorization tests are implemented; see `docs/DATABASE.md`. Authentication integration, onboarding, and own-profile editing are implemented. Hosted database setup, task browsing, checklists, mentor support, and contribution tracking UI remain pending.
+The foundation adds a Next.js landing page, a 404 page, development scripts, CI, contribution templates, and this plan. The initial database migration and authorization tests are implemented; see `docs/DATABASE.md`. Authentication integration, onboarding, and own-profile editing are implemented. The public opportunity directory includes published cards, combined filters, URL state, and pagination. Hosted database setup, guided checklists, mentor support, and contribution tracking UI remain pending.
 
 The landing page describes planned behavior and links to GitHub. It does not contain sample opportunities presented as real ones. No production database or hosted deployment is configured.
 
