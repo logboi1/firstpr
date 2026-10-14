@@ -2,7 +2,7 @@
 
 Helping newcomers make their first open-source contribution through curated tasks, practical guidance, and mentor support.
 
-**Status: early development.** The project includes a responsive landing page, TypeScript, Tailwind CSS, CI, and a tested database migration with access policies. The contribution platform's UI and Supabase authentication integration are not implemented yet.
+**Status: early development.** The project includes a responsive landing page, TypeScript, Tailwind CSS, CI, and a tested database migration with access policies. Email-code sign-in, onboarding, cookie sessions, and own-profile editing are implemented. Task browsing, mentor workflows, and progress tracking UI remain in development.
 
 ## The MVP
 
@@ -25,7 +25,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. No credentials or database are required for the foundation page. `.env.example` contains placeholders for future Supabase integration; filling them does not enable features that have not been built.
+Open http://localhost:3000. No credentials or database are required for the foundation page. Follow [AUTHENTICATION.md](docs/AUTHENTICATION.md) to configure Supabase, apply migrations, and set up email-code sign-in. Without configuration, the account pages explain that sign-in is unavailable.
 
 ## Checks
 
@@ -36,7 +36,7 @@ npm run test:db
 npm run build
 ```
 
-`npm run check` runs all four. For production, build first, then run `npm start`.
+`npm run check` runs these checks plus authentication validation tests. `npm run test:e2e` runs the browser contract tests; see the authentication guide. For production, build first, then run `npm start`.
 
 ## Database
 

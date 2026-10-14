@@ -62,3 +62,21 @@ h1 > span { color: #527d5b; }
 @media (max-width: 950px) { .shell { width: calc(100% - 48px); } .hero { gap: 35px; } .journey { padding: 22px; } .preview-label { display: none; } .build-section { align-items: start; flex-direction: column; gap: 22px; } }
 @media (max-width: 680px) { .shell { width: calc(100% - 40px); } .header { min-height: 82px; } .wordmark .alpha { display: none; } nav { gap: 16px; font-size: 11px; } .hero { grid-template-columns: 1fr; gap: 40px; padding-block: 45px; } h1 { font-size: 59px; } .intro { font-size: 15px; } .journey { transform: none; } .principle-list { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 12px; font-size: 9px; } .principle-list span::before { margin-right: 5px; } .how { padding-block: 48px; } .section-heading { align-items: start; flex-direction: column; gap: 8px; } .steps { grid-template-columns: 1fr; } .step { padding: 24px; } .step h3 { margin-top: 16px; } .step p { font-size: 13px; } .build-section { padding: 25px; margin-bottom: 40px; } .footer { flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+.account-main { padding-block: 48px 80px; }
+.account-card { max-width: 650px; margin: 0 auto; padding: clamp(24px, 5vw, 48px); border: 1px solid #ced8c8; border-radius: 16px; background: #fff; }
+.account-card h1 { font-size: clamp(32px, 5vw, 46px); letter-spacing: -.04em; overflow-wrap: anywhere; }
+.account-card p { line-height: 1.7; }
+.account-form { display: grid; gap: 12px; margin-block: 24px; }
+.account-form label { font-weight: 600; }
+.account-form input:not([type=checkbox]), .account-form select { width: 100%; border: 1px solid #8d9c88; border-radius: 6px; padding: 12px; background: white; color: #183d2b; }
+.account-form .field-hint { font-size: 13px; margin: 0; color: #52614c; }
+.checkbox-label { display: flex; gap: 12px; align-items: start; line-height: 1.6; }
+.checkbox-label input { margin-top: 6px; flex-shrink: 0; }
+.form-error { color: #9f2222; }
+.form-error:empty, [role=status]:empty { display: none; }
+button { cursor: pointer; }
+button:disabled { opacity: .6; cursor: wait; }
+.profile-summary { display: grid; gap: 8px; margin-block: 28px; }
+.profile-summary dt { font-weight: 700; margin-top: 12px; }
+.profile-summary dd { margin: 0; overflow-wrap: anywhere; }

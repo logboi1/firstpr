@@ -2,7 +2,7 @@
 
 The initial migration is `supabase/migrations/20261014190000_initial_schema.sql`. It creates all seven MVP tables, enums, indexes, constraints, profile bootstrap, RLS policies, column grants, workflow guards, and a narrow public progress RPC.
 
-This commit does not connect the Next.js application to Supabase or implement the sign-in screens. Authentication UI and session handling are issue #3. No migration has been applied to a hosted database by the assistant.
+Issue #3 connects the application using participant sessions; see `AUTHENTICATION.md`. The additive `20261014220000_profile_onboarding.sql` migration adds an own-editable onboarding completion flag without changing authorization roles. No migration has been applied to a hosted database by the assistant.
 
 ## Apply to Supabase
 

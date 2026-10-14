@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import pg from "pg";
@@ -45,7 +45,10 @@ test("FirstPR migration and database access boundaries", async (suite) => {
     alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
     alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
   `);
-  await db.exec(readFileSync(new URL("../../supabase/migrations/20261014190000_initial_schema.sql", import.meta.url), "utf8"));
+  const migrations = new URL("../../supabase/migrations/", import.meta.url);
+  for (const name of readdirSync(migrations).filter(name => name.endsWith(".sql")).sort()) {
+    await db.exec(readFileSync(new URL(name, migrations), "utf8"));
+  }
   await db.exec(readFileSync(new URL("../../supabase/seed.sql", import.meta.url), "utf8"));
 
   async function actor(name) {
@@ -95,6 +98,10 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       assert.deepEqual((await rows("select id from public.profiles")).map((row) => row.id), [ids.alice]);
       assert.equal((await rows("update public.profiles set display_name='Alice Demo' where id=$1 returning id", [ids.alice])).length, 1);
       assert.equal((await rows("update public.profiles set display_name='tampered' where id=$1 returning id", [ids.bob])).length, 0);
+      assert.equal((await rows("select onboarding_completed from public.profiles"))[0].onboarding_completed, false);
+      assert.equal((await rows("update public.profiles set skills=ARRAY['React'], experience='intermediate', onboarding_completed=true where id=$1 returning id", [ids.alice])).length, 1);
+      assert.equal((await rows("update public.profiles set onboarding_completed=true where id=$1 returning id", [ids.bob])).length, 0);
+      await denied("update public.profiles set id=$1 where id=$2", [ids.bob, ids.alice]);
       await denied("update public.profiles set created_at=now() where id=$1", [ids.alice]);
     });
     await suite.test("participants cannot self-promote or change any role assignment", async () => {
