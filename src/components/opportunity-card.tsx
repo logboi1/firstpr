@@ -1,0 +1,6 @@
+import type { Opportunity } from "@/lib/opportunities/data";
+import { label } from "@/lib/opportunities/filters";
+export function OpportunityCard({ opportunity }: { opportunity: Opportunity }) {
+  const repository = new URL(opportunity.repository_url);
+  return <article className="opportunity-card" aria-labelledby={`task-${opportunity.id}`}><div className="opportunity-meta"><span className={`difficulty difficulty-${opportunity.difficulty}`}>{label(opportunity.difficulty)}</span><span>{label(opportunity.contribution_type)}</span></div><h2 id={`task-${opportunity.id}`}>{opportunity.title}</h2><p className="opportunity-summary">{opportunity.summary}</p><ul className="skill-tags" aria-label="Required skills">{opportunity.skills.map((skill, index) => <li key={`${index}-${skill}`}>{skill}</li>)}</ul><div className="opportunity-links"><a className="repository-name" href={opportunity.repository_url} target="_blank" rel="noopener noreferrer" aria-label={`Repository for ${opportunity.title} (opens in a new tab)`}>{repository.hostname}{repository.pathname.replace(/\/$/, "")} <span aria-hidden="true">↗</span></a><a className="button secondary" href={opportunity.issue_url} target="_blank" rel="noopener noreferrer" aria-label={`View source issue for ${opportunity.title} (opens in a new tab)`}>View source issue <span aria-hidden="true">↗</span></a></div></article>;
+}

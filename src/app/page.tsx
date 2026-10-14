@@ -13,7 +13,7 @@ export default function Home() {
     <>
       <header className="shell header">
         <Link className="wordmark" href="/" aria-label="FirstPR home"><span className="brand-icon" aria-hidden="true">↗</span>First<span>PR</span><span className="alpha">building in public</span></Link>
-        <nav aria-label="Main navigation"><a href="#how-it-works">The idea</a><Link href="/sign-in">Sign in</Link><a className="repo-link" href={repository}>GitHub <span aria-hidden="true">↗</span></a></nav>
+        <nav aria-label="Main navigation"><Link href="/opportunities">Find a task</Link><Link href="/sign-in">Sign in</Link><a className="repo-link" href={repository}>GitHub <span aria-hidden="true">↗</span></a></nav>
       </header>
       <main id="main">
         <section className="shell hero" aria-labelledby="hero-title">
@@ -21,8 +21,8 @@ export default function Home() {
             <p className="eyebrow"><span className="status-dot" aria-hidden="true"/> OPEN SOURCE. OPEN TO YOU.</p>
             <h1 id="hero-title">Your first<br/>contribution.<br/><span>A little closer.</span></h1>
             <p className="intro">You don’t have to figure out open source alone. We’re building a friendlier path from “where do I start?” to your first pull request.</p>
-            <div className="actions"><a className="button primary" href={`${repository}/issues`}>Help build FirstPR <span aria-hidden="true">↗</span></a><a className="button secondary" href="#how-it-works">Explore the idea <span aria-hidden="true">↓</span></a></div>
-            <p className="availability">In development · Create your profile now. Task browsing is coming next.</p>
+            <div className="actions"><Link className="button primary" href="/opportunities">Find your first task <span aria-hidden="true">↗</span></Link><a className="button secondary" href="#how-it-works">Explore the idea <span aria-hidden="true">↓</span></a></div>
+            <p className="availability">In development · Browse tasks and create your profile. Guided checklists are coming next.</p>
           </div>
           <div className="journey" aria-label="Preview of the planned contribution journey">
             <div className="journey-top"><span className="mini-brand">↗ FIRST STEPS</span><span className="preview-label">CONCEPT PREVIEW</span></div>
