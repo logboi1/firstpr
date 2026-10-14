@@ -22,7 +22,7 @@ export default function Home() {
             <h1 id="hero-title">Your first<br/>contribution.<br/><span>A little closer.</span></h1>
             <p className="intro">You don’t have to figure out open source alone. We’re building a friendlier path from “where do I start?” to your first pull request.</p>
             <div className="actions"><Link className="button primary" href="/opportunities">Find your first task <span aria-hidden="true">↗</span></Link><a className="button secondary" href="#how-it-works">Explore the idea <span aria-hidden="true">↓</span></a></div>
-            <p className="availability">In development · Browse tasks and create your profile. Guided checklists are coming next.</p>
+            <p className="availability">In development · Browse tasks and create your profile. Save checklist progress as you contribute.</p>
           </div>
           <div className="journey" aria-label="Preview of the planned contribution journey">
             <div className="journey-top"><span className="mini-brand">↗ FIRST STEPS</span><span className="preview-label">CONCEPT PREVIEW</span></div>

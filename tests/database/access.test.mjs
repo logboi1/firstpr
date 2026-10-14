@@ -68,7 +68,7 @@ test("FirstPR migration and database access boundaries", async (suite) => {
   try {
     await suite.test("migration enables RLS on every app table", async () => {
       const tables = await rows("select relname, relrowsecurity from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'");
-      assert.equal(tables.length, 7);
+      assert.equal(tables.length, 8);
       assert.ok(tables.every((table) => table.relrowsecurity));
     });
     await suite.test("signup creates a private profile without trusting metadata roles or consent", async () => {
@@ -88,7 +88,7 @@ test("FirstPR migration and database access boundaries", async (suite) => {
     });
     await suite.test("visitors cannot read any private table or write public opportunities", async () => {
       await actor();
-      for (const table of ["profiles", "user_roles", "checklist_progress", "help_requests", "contributions"]) {
+      for (const table of ["profiles", "user_roles", "opportunity_participations", "checklist_progress", "help_requests", "contributions"]) {
         await denied(`select * from public.${table}`);
       }
       await denied("update public.opportunities set title='tampered'");
@@ -331,6 +331,86 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       await denied("delete from public.checklist_steps where id=$1", [step]);
       // Draft checklist edits remain available.
       assert.equal((await rows("update public.checklist_steps set label='Reviewed instructions' where id=$1 returning id", [draftStep])).length, 1);
+    });
+    await suite.test("native PostgreSQL blocks a new start behind archival then rejects it", {skip:!nativeDatabaseUrl}, async()=>{
+      await admin();
+      const task=(await rows("insert into public.opportunities(title,summary,contribution_type,repository_url,issue_url,setup_notes,status) values ('Archive race','Fixture','code','https://example.invalid/race','https://example.invalid/race/1','Setup','published') returning id"))[0].id;
+      const archiver=new pg.Client({connectionString:nativeDatabaseUrl,query_timeout:10000});
+      const starter=new pg.Client({connectionString:nativeDatabaseUrl,query_timeout:10000});
+      await archiver.connect(); await starter.connect();
+      let pending;
+      try {
+        await archiver.query('begin');
+        await archiver.query("update public.opportunities set status='archived' where id=$1",[task]);
+        await starter.query("select set_config('request.jwt.claim.sub',$1,false)",[ids.bob]);
+        await starter.query('set role authenticated');
+        pending=starter.query('select public.start_opportunity($1)',[task]).then(result=>({result}),error=>({error}));
+        let blocked=false;
+        for(let attempt=0;attempt<100;attempt++) {
+          const activity=await rows('select wait_event_type from pg_stat_activity where pid=$1',[starter.processID]);
+          if(activity[0]?.wait_event_type==='Lock'){blocked=true;break;}
+          await new Promise(resolve=>setTimeout(resolve,20));
+        }
+        assert.ok(blocked,'start must wait for archival transaction');
+        await archiver.query('commit');
+        assert.equal((await pending).error?.code,'42501');
+        assert.equal((await rows('select * from public.opportunity_participations where opportunity_id=$1',[task])).length,0);
+      } finally {
+        await archiver.query('rollback');
+        if(pending) await pending;
+        await archiver.end(); await starter.end();
+      }
+    });
+    await suite.test("task details and checklist RPCs isolate owners and preserve archived starts after all steps are unchecked", async () => {
+      await admin();
+      const task=(await rows("insert into public.opportunities(title,summary,contribution_type,repository_url,issue_url,setup_notes,prerequisites,status) values ('Checklist test','Fixture','code','https://example.invalid/checklist','https://example.invalid/checklist/1','Install then test','Read the guide','published') returning id"))[0].id;
+      const late=(await rows("insert into public.checklist_steps(opportunity_id,label,position) values ($1,'Second step',2) returning id",[task]))[0].id;
+      const early=(await rows("insert into public.checklist_steps(opportunity_id,label,position) values ($1,'First step',1) returning id",[task]))[0].id;
+      const detail=async()=> (await rows("select public.get_opportunity_detail($1) as data",[task]))[0].data;
+      await actor();
+      assert.deepEqual((await detail()).steps.map(s=>s.label),['First step','Second step']);
+      assert.equal((await detail()).started,false);
+      await denied("select public.start_opportunity($1)",[task]);
+      await denied("select public.set_checklist_step($1,$2,true)",[task,early]);
+      for(const name of ['alice','curator']) {
+        await actor(name);
+        assert.equal((await rows("select public.get_opportunity_detail($1) as data",[draft]))[0].data,null);
+        await denied("select public.start_opportunity($1)",[draft]);
+      }
+      await actor('alice');
+      await db.query("select public.start_opportunity($1)",[task]);
+      await db.query("select public.start_opportunity($1)",[task]);
+      assert.equal((await rows("select * from public.opportunity_participations where opportunity_id=$1",[task])).length,1);
+      await denied("insert into public.opportunity_participations(participant_id,opportunity_id) values ($1,$2)",[ids.bob,task]);
+      await denied("delete from public.opportunity_participations");
+      await db.query("select public.set_checklist_step($1,$2,true)",[task,early]);
+      await db.query("select public.set_checklist_step($1,$2,true)",[task,early]);
+      assert.deepEqual((await detail()).steps.map(s=>s.completed),[true,false]);
+      await denied("select public.set_checklist_step($1,$2,true)",[task,step]);
+      await actor('bob');
+      assert.equal((await detail()).started,false);
+      assert.ok((await detail()).steps.every(s=>!s.completed));
+      assert.equal((await rows("select * from public.opportunity_participations where opportunity_id=$1",[task])).length,0);
+      await db.query("select public.set_checklist_step($1,$2,true)",[task,late]);
+      await db.query("select public.set_checklist_step($1,$2,false)",[task,early]);
+      await actor('alice');
+      assert.equal((await detail()).steps[0].completed,true);
+      await admin();
+      await db.query("update public.opportunities set status='archived' where id=$1",[task]);
+      await actor('otherMentor');
+      assert.equal(await detail(),null);
+      await denied("select public.start_opportunity($1)",[task]);
+      await denied("select public.set_checklist_step($1,$2,true)",[task,early]);
+      await actor('alice');
+      await db.query("select public.set_checklist_step($1,$2,false)",[task,early]);
+      assert.equal((await detail()).started,true);
+      assert.ok((await detail()).steps.every(s=>!s.completed));
+      await db.query("select public.set_checklist_step($1,$2,true)",[task,late]);
+      assert.equal((await detail()).steps[1].completed,true);
+      await db.query("select set_config('request.jwt.claim.sub','',false)");
+      await denied("select public.start_opportunity($1)",[task]);
+      await denied("select public.set_checklist_step($1,$2,true)",[task,late]);
+      await admin();
     });
     await suite.test("private helpers have fixed search paths and trigger functions are not client-callable", async () => {
       await admin();

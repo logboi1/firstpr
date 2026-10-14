@@ -95,6 +95,16 @@ Archived opportunities leave the visitor directory and cannot be edited. Partici
 
 `public.get_public_progress(page_size)` returns only `display_name`, `pr_url`, `status`, and `submitted_at`, filtered by current profile consent. It never returns emails, participant IDs, skills, blockers, mentor identities, or verifier details. The page size defaults to 50 and is clamped to 1–100. Revoking consent removes the user's rows from subsequent RPC calls. This initial RPC serves the recent board; pagination is a later UI concern.
 
+## Opportunity starts and checklist details
+
+`20261014235500_opportunity_checklists.sql` adds the eighth table, `opportunity_participations`, with own-only SELECT and no client insert/update/delete grants. Starting a task writes an owner-derived durable marker. Existing progress, help, and contribution records are backfilled into markers, and a progress-insert trigger preserves a start for direct API inserts as well. Clearing every completion no longer removes an existing participant's archived-task access.
+
+`start_opportunity(wanted)` uses narrowly scoped definer privileges to write this otherwise read-only table. It derives ownership from `auth.uid()`, checks publication or existing archived participation, and takes a shared row lock that conflicts with archival updates. New starts waiting behind archival are rejected once that transaction commits. No caller-supplied participant ID is accepted.
+
+`set_checklist_step(wanted,step,completed)` uses invoker privileges and existing progress RLS, verifies step membership, and sets explicit desired completion (rather than toggling). Repeat completion requests are idempotent. The insert trigger locks and checks the task before recording a start and completion in the same transaction. An incomplete request deletes only the actor's completion.
+
+`get_opportunity_detail(wanted)` is an invoker-security read with explicit published/existing-archived filtering, even for curators. It returns ordered steps and only the caller's completion flags; there are no participant IDs, timestamps, or other people's progress in the response. The narrow `private.step_is_completed` helper reads only the current actor's completion, avoiding anonymous SELECT grants on private progress. All new functions have fixed empty search paths, explicit execute grants, and no authorization from profile metadata.
+
 ## Public opportunity directory
 
 `20261014223000_opportunity_directory.sql` adds `browse_opportunities(search_query, skill_filter, type_filter, difficulty_filter, page_number)`. It uses invoker security and a fixed empty search path, retains RLS, and explicitly selects only published opportunities for every caller. Execute permission is limited to `anon` and `authenticated` (plus the function owner); it has no write operations.

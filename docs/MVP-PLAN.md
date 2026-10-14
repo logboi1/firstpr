@@ -1,6 +1,6 @@
 # FirstPR — MVP project plan
 
-Status: Foundation, database, authentication, and public opportunity directory implemented. Remaining MVP workflows are in the backlog.
+Status: Foundation, database, authentication, and public opportunity directory implemented. Task details and saved checklists are implemented; remaining MVP workflows are in the backlog.
 
 ## Purpose
 
@@ -61,6 +61,7 @@ Enforce access on the server and in Supabase row-level security policies. Never 
 | `opportunities` | title, summary, skills, contribution type, difficulty, repository URL, issue URL, prerequisites, setup notes, publication status, creator |
 | `checklist_steps` | opportunity ID, label, position |
 | `checklist_progress` | participant ID, checklist step ID, completed timestamp |
+| `opportunity_participations` | participant ID, opportunity ID, durable start timestamp |
 | `help_requests` | participant ID, opportunity ID, blocker text, status, assigned mentor ID, timestamps |
 | `contributions` | participant ID, opportunity ID, PR URL, status, verifier ID, verification timestamp |
 
@@ -160,7 +161,7 @@ First implementation task after repository access: task 01, followed by task 02.
 
 ## Current implementation status
 
-The foundation adds a Next.js landing page, a 404 page, development scripts, CI, contribution templates, and this plan. The initial database migration and authorization tests are implemented; see `docs/DATABASE.md`. Authentication integration, onboarding, and own-profile editing are implemented. The public opportunity directory includes published cards, combined filters, URL state, and pagination. Hosted database setup, guided checklists, mentor support, and contribution tracking UI remain pending.
+The foundation adds a Next.js landing page, a 404 page, development scripts, CI, contribution templates, and this plan. The initial database migration and authorization tests are implemented; see `docs/DATABASE.md`. Authentication integration, onboarding, and own-profile editing are implemented. The public opportunity directory includes published cards, combined filters, URL state, and pagination. Task details and saved contribution checklists are implemented. Hosted database setup, mentor support, and the progress board remain pending.
 
 The landing page describes planned behavior and links to GitHub. It does not contain sample opportunities presented as real ones. No production database or hosted deployment is configured.
 
