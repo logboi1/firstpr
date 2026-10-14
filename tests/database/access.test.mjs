@@ -1,0 +1,301 @@
+import { PGlite } from "@electric-sql/pglite";
+import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import pg from "pg";
+
+// This URL must point to a fresh, disposable test database; bootstrap creates roles and auth stubs.
+const nativeDatabaseUrl = process.env.FIRSTPR_TEST_DATABASE_URL;
+async function openDatabase() {
+  if (!nativeDatabaseUrl) return new PGlite();
+  const client = new pg.Client({ connectionString: nativeDatabaseUrl });
+  await client.connect();
+  return {
+    exec: (sql) => client.query(sql),
+    query: (sql, parameters) => client.query(sql, parameters),
+    close: () => client.end(),
+  };
+}
+
+const ids = {
+  alice: "30000000-0000-4000-8000-000000000001",
+  bob: "30000000-0000-4000-8000-000000000002",
+  mentor: "30000000-0000-4000-8000-000000000003",
+  otherMentor: "30000000-0000-4000-8000-000000000004",
+  curator: "30000000-0000-4000-8000-000000000005",
+};
+const opportunity = "10000000-0000-4000-8000-000000000001";
+const draft = "10000000-0000-4000-8000-000000000003";
+const step = "20000000-0000-4000-8000-000000000001";
+const draftStep = "20000000-0000-4000-8000-000000000003";
+
+test("FirstPR migration and database access boundaries", async (suite) => {
+  const db = await openDatabase();
+  await db.exec(`
+    create role anon nologin;
+    create role authenticated nologin;
+    create role service_role nologin bypassrls;
+    create schema auth;
+    create table auth.users(id uuid primary key, raw_user_meta_data jsonb default '{}');
+    create function auth.uid() returns uuid language sql stable as $$
+      select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+    $$;
+    grant usage on schema public, auth to anon, authenticated, service_role;
+    grant execute on function auth.uid() to anon, authenticated, service_role;
+    alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+    alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+  `);
+  await db.exec(readFileSync(new URL("../../supabase/migrations/20261014190000_initial_schema.sql", import.meta.url), "utf8"));
+  await db.exec(readFileSync(new URL("../../supabase/seed.sql", import.meta.url), "utf8"));
+
+  async function actor(name) {
+    await db.exec("reset role");
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [name ? ids[name] : ""]);
+    await db.exec(`set role ${name ? "authenticated" : "anon"}`);
+  }
+  async function admin() {
+    await db.exec("reset role");
+    await db.query("select set_config('request.jwt.claim.sub', '', false)");
+  }
+  async function rows(sql, args = []) { return (await db.query(sql, args)).rows; }
+  async function denied(sql, args = [], code = "42501") {
+    await assert.rejects(() => db.query(sql, args), (error) => error.code === code);
+  }
+
+  try {
+    await suite.test("migration enables RLS on every app table", async () => {
+      const tables = await rows("select relname, relrowsecurity from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'");
+      assert.equal(tables.length, 7);
+      assert.ok(tables.every((table) => table.relrowsecurity));
+    });
+    await suite.test("signup creates a private profile without trusting metadata roles or consent", async () => {
+      for (const id of Object.values(ids)) {
+        await db.query("insert into auth.users(id, raw_user_meta_data) values ($1, '{\"role\":\"curator\",\"public_board_consent\":true}')", [id]);
+      }
+      assert.equal((await rows("select * from public.profiles")).length, 5);
+      assert.equal((await rows("select * from public.user_roles")).length, 0);
+      assert.ok((await rows("select public_board_consent from public.profiles")).every((row) => !row.public_board_consent));
+      await db.query("insert into public.user_roles(user_id, role) values ($1,'mentor'),($2,'mentor'),($3,'curator')", [ids.mentor, ids.otherMentor, ids.curator]);
+    });
+    await suite.test("visitors see published opportunities and their steps, never drafts", async () => {
+      await actor();
+      assert.equal((await rows("select id from public.opportunities")).length, 2);
+      assert.equal((await rows("select id from public.opportunities where id=$1", [draft])).length, 0);
+      assert.equal((await rows("select id from public.checklist_steps where id=$1", [draftStep])).length, 0);
+    });
+    await suite.test("visitors cannot read any private table or write public opportunities", async () => {
+      await actor();
+      for (const table of ["profiles", "user_roles", "checklist_progress", "help_requests", "contributions"]) {
+        await denied(`select * from public.${table}`);
+      }
+      await denied("update public.opportunities set title='tampered'");
+    });
+    await suite.test("participants read and edit only their own profile", async () => {
+      await actor("alice");
+      assert.deepEqual((await rows("select id from public.profiles")).map((row) => row.id), [ids.alice]);
+      assert.equal((await rows("update public.profiles set display_name='Alice Demo' where id=$1 returning id", [ids.alice])).length, 1);
+      assert.equal((await rows("update public.profiles set display_name='tampered' where id=$1 returning id", [ids.bob])).length, 0);
+      await denied("update public.profiles set created_at=now() where id=$1", [ids.alice]);
+    });
+    await suite.test("participants cannot self-promote or change any role assignment", async () => {
+      await actor("alice");
+      await denied("insert into public.user_roles(user_id,role) values ($1,'curator')", [ids.alice]);
+      await denied("update public.user_roles set role='curator'");
+      await denied("delete from public.user_roles");
+      assert.equal((await rows("select * from public.user_roles")).length, 0);
+      await denied("select private.create_profile()");
+    });
+    await suite.test("participants and mentors cannot edit opportunities", async () => {
+      for (const name of ["alice", "mentor"]) {
+        await actor(name);
+        assert.equal((await rows("update public.opportunities set title='tampered' where id=$1 returning id", [opportunity])).length, 0);
+        await denied("insert into public.opportunities(title,summary,contribution_type,repository_url,issue_url) values ('x','x','code','https://example.invalid/x','https://example.invalid/x/1')");
+      }
+    });
+    await suite.test("curators can read drafts and create and edit opportunities", async () => {
+      await actor("curator");
+      assert.equal((await rows("select id from public.opportunities where id=$1", [draft])).length, 1);
+      assert.equal((await rows("update public.opportunities set title='[DEMO] Reviewed draft' where id=$1 returning id", [draft])).length, 1);
+      const created = await rows("insert into public.opportunities(title,summary,contribution_type,repository_url,issue_url) values ('[DEMO] New draft','Local fixture','code','https://example.invalid/new','https://example.invalid/new/1') returning created_by");
+      assert.equal(created[0].created_by, ids.curator);
+      await denied("update public.opportunities set status='published' where id=$1", [draft], "23514");
+      await denied("delete from public.opportunities where id=$1", [draft]);
+    });
+    await suite.test("checklist progress is private, unique, and cannot be forged for another user or draft", async () => {
+      await actor("alice");
+      await db.query("insert into public.checklist_progress(checklist_step_id) values ($1)", [step]);
+      await denied("insert into public.checklist_progress(checklist_step_id) values ($1)", [step], "23505");
+      await denied("insert into public.checklist_progress(participant_id,checklist_step_id) values ($1,$2)", [ids.bob, step]);
+      await denied("insert into public.checklist_progress(checklist_step_id) values ($1)", [draftStep]);
+      await actor("bob");
+      assert.equal((await rows("select * from public.checklist_progress")).length, 0);
+      assert.equal((await rows("update public.checklist_progress set completed_at=now() returning participant_id")).length, 0);
+      assert.equal((await rows("delete from public.checklist_progress returning participant_id")).length, 0);
+    });
+
+    let helpId;
+    await suite.test("participants create open help requests; other participants cannot read them", async () => {
+      await actor("alice");
+      helpId = (await rows("insert into public.help_requests(opportunity_id,blocker) values ($1,'Fictional setup blocker') returning id", [opportunity]))[0].id;
+      await denied("insert into public.help_requests(opportunity_id,blocker,status) values ($1,'x','resolved')", [opportunity]);
+      await denied("insert into public.help_requests(opportunity_id,blocker) values ($1,'x')", [draft]);
+      await denied("insert into public.help_requests(opportunity_id,blocker) values ($1,' ')", [opportunity], "23514");
+      await actor("bob");
+      assert.equal((await rows("select * from public.help_requests")).length, 0);
+      assert.equal((await rows("update public.help_requests set status='cancelled' where id=$1 returning id", [helpId])).length, 0);
+    });
+    await suite.test("participants cannot claim or resolve their own request", async () => {
+      await actor("alice");
+      await denied("update public.help_requests set status='claimed', assigned_mentor_id=$1 where id=$2", [ids.alice, helpId]);
+      await denied("update public.help_requests set status='resolved', assigned_mentor_id=$1 where id=$2", [ids.mentor, helpId]);
+    });
+    await suite.test("native PostgreSQL serializes simultaneous mentor claims", { skip: !nativeDatabaseUrl }, async () => {
+      await actor("alice");
+      const id = (await rows("insert into public.help_requests(opportunity_id,blocker) values ($1,'Concurrent claim fixture') returning id", [opportunity]))[0].id;
+      const first = new pg.Client({ connectionString: nativeDatabaseUrl, query_timeout: 10000 });
+      const second = new pg.Client({ connectionString: nativeDatabaseUrl, query_timeout: 10000 });
+      await first.connect();
+      await second.connect();
+      let pending;
+      try {
+        for (const [client, userId] of [[first, ids.mentor], [second, ids.otherMentor]]) {
+          await client.query("select set_config('request.jwt.claim.sub', $1, false)", [userId]);
+          await client.query("set role authenticated");
+          await client.query("begin");
+        }
+        const claim = "update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 and status='open' returning id";
+        assert.equal((await first.query(claim, [id])).rows.length, 1);
+        pending = second.query(claim, [id]);
+        // Confirm a real lock wait before releasing the first transaction.
+        await admin();
+        let blocked = false;
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const activity = await rows("select wait_event_type from pg_stat_activity where pid=$1", [second.processID]);
+          if (activity[0]?.wait_event_type === "Lock") { blocked = true; break; }
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        assert.ok(blocked, "second claim should wait on the first transaction's row lock");
+        await first.query("commit");
+        assert.equal((await pending).rows.length, 0);
+        await second.query("commit");
+        assert.equal((await rows("select assigned_mentor_id from public.help_requests where id=$1", [id]))[0].assigned_mentor_id, ids.mentor);
+      } finally {
+        await first.query("rollback");
+        await second.query("rollback");
+        if (pending) await pending.catch(() => {});
+        await first.end();
+        await second.end();
+      }
+    });
+    await suite.test("mentor sees queue, cannot assign another mentor, and can claim the request", async () => {
+      await actor("mentor");
+      assert.equal((await rows("select id from public.help_requests where id=$1", [helpId])).length, 1);
+      await denied("update public.help_requests set status='claimed',assigned_mentor_id=$1 where id=$2", [ids.otherMentor, helpId]);
+      assert.equal((await rows("update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 and status='open' returning id", [helpId])).length, 1);
+    });
+    await suite.test("second mentor loses the claim and cannot resolve or alter another mentor's request", async () => {
+      await actor("otherMentor");
+      assert.equal((await rows("update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 and status='open' returning id", [helpId])).length, 0);
+      assert.equal((await rows("update public.help_requests set status='resolved' where id=$1 returning id", [helpId])).length, 0);
+      assert.equal((await rows("update public.help_requests set blocker='tampered' where id=$1 returning id", [helpId])).length, 0);
+    });
+    await suite.test("assigned mentor can release, reclaim, and resolve but cannot rewrite blocker or reopen resolved requests", async () => {
+      await actor("mentor");
+      await denied("update public.help_requests set blocker='tampered' where id=$1", [helpId]);
+      await db.query("update public.help_requests set status='open',assigned_mentor_id=null where id=$1", [helpId]);
+      await db.query("update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 and status='open'", [helpId]);
+      await db.query("update public.help_requests set status='resolved' where id=$1", [helpId]);
+      assert.equal((await rows("select status from public.help_requests where id=$1", [helpId]))[0].status, "resolved");
+      assert.equal((await rows("update public.help_requests set status='open',assigned_mentor_id=null where id=$1 returning id", [helpId])).length, 0);
+    });
+    await suite.test("curator role does not expose private help queue or other profiles", async () => {
+      await actor("curator");
+      assert.equal((await rows("select id from public.help_requests")).length, 0);
+      assert.equal((await rows("select id from public.profiles")).length, 1);
+    });
+    await suite.test("participants can cancel their own open requests", async () => {
+      await actor("alice");
+      const id = (await rows("insert into public.help_requests(opportunity_id,blocker) values ($1,'Another fictional blocker') returning id", [opportunity]))[0].id;
+      await db.query("update public.help_requests set status='cancelled' where id=$1", [id]);
+      assert.equal((await rows("select status from public.help_requests where id=$1", [id]))[0].status, "cancelled");
+    });
+
+    let contributionId;
+    await suite.test("participants submit valid PRs; duplicates and invalid URLs are rejected", async () => {
+      await actor("alice");
+      contributionId = (await rows("insert into public.contributions(opportunity_id,pr_url) values ($1,'https://github.com/firstpr-demo/docs/pull/1') returning id", [opportunity]))[0].id;
+      await denied("insert into public.contributions(opportunity_id,pr_url) values ($1,'https://github.com/firstpr-demo/docs/pull/1')", [opportunity], "23505");
+      await denied("insert into public.contributions(opportunity_id,pr_url) values ($1,'https://evil.invalid/pull/1')", [opportunity], "23514");
+      await denied("insert into public.contributions(opportunity_id,pr_url,status) values ($1,'https://github.com/firstpr-demo/docs/pull/2','merged')", [opportunity]);
+      await denied("update public.contributions set status='merged' where id=$1", [contributionId]);
+      await denied("update public.contributions set verifier_id=$1 where id=$2", [ids.curator, contributionId]);
+    });
+    await suite.test("other participants and mentors cannot read or verify contributions", async () => {
+      for (const name of ["bob", "mentor"]) {
+        await actor(name);
+        assert.equal((await rows("select * from public.contributions")).length, 0);
+        assert.equal((await rows("update public.contributions set status='merged' where id=$1 returning id", [contributionId])).length, 0);
+      }
+    });
+    await suite.test("curator verification automatically records actor and time; participant cannot replace a verified PR", async () => {
+      await actor("curator");
+      await db.query("update public.contributions set status='merged' where id=$1", [contributionId]);
+      const verified = (await rows("select * from public.contributions where id=$1", [contributionId]))[0];
+      assert.equal(verified.verifier_id, ids.curator);
+      assert.ok(verified.verified_at);
+      await actor("alice");
+      assert.equal((await rows("update public.contributions set pr_url='https://github.com/firstpr-demo/docs/pull/3' where id=$1 returning id", [contributionId])).length, 0);
+    });
+    await suite.test("curators cannot self-verify", async () => {
+      await actor("curator");
+      const ownId = (await rows("insert into public.contributions(opportunity_id,pr_url) values ($1,'https://github.com/firstpr-demo/docs/pull/4') returning id", [opportunity]))[0].id;
+      await denied("update public.contributions set status='merged' where id=$1", [ownId]);
+    });
+    await suite.test("public progress is opt-in and exposes only the deliberate projection", async () => {
+      await actor();
+      assert.equal((await rows("select * from public.get_public_progress()")).length, 0);
+      await actor("alice");
+      await db.query("update public.profiles set public_board_consent=true where id=auth.uid()");
+      await actor();
+      const board = await rows("select * from public.get_public_progress(100000)");
+      assert.equal(board.length, 1);
+      assert.deepEqual(Object.keys(board[0]).sort(), ["display_name", "pr_url", "status", "submitted_at"].sort());
+      assert.equal(board[0].status, "merged");
+      await actor("alice");
+      await db.query("update public.profiles set public_board_consent=false where id=auth.uid()");
+      await actor();
+      assert.equal((await rows("select * from public.get_public_progress()")).length, 0);
+    });
+    await suite.test("archiving preserves instructions for existing participants and blocks new participants", async () => {
+      await actor("curator");
+      await db.query("update public.opportunities set status='archived' where id=$1", [opportunity]);
+      assert.equal((await rows("update public.opportunities set setup_notes='changed' where id=$1 returning id", [opportunity])).length, 0);
+      await denied("update public.checklist_steps set label='changed' where id=$1", [step]);
+      await actor();
+      assert.equal((await rows("select id from public.opportunities where id=$1", [opportunity])).length, 0);
+      await actor("bob");
+      assert.equal((await rows("select id from public.opportunities where id=$1", [opportunity])).length, 0);
+      await denied("insert into public.help_requests(opportunity_id,blocker) values ($1,'new participant')", [opportunity]);
+      await denied("insert into public.checklist_progress(checklist_step_id) values ($1)", [step]);
+      await actor("alice");
+      assert.equal((await rows("select id from public.opportunities where id=$1", [opportunity])).length, 1);
+      assert.equal((await rows("select id from public.checklist_steps where id=$1", [step])).length, 1);
+      await db.query("insert into public.help_requests(opportunity_id,blocker) values ($1,'Existing participant continues')", [opportunity]);
+    });
+    await suite.test("published checklist steps cannot be deleted, even by curators", async () => {
+      await actor("curator");
+      await denied("delete from public.checklist_steps where id=$1", [step]);
+      // Draft checklist edits remain available.
+      assert.equal((await rows("update public.checklist_steps set label='Reviewed instructions' where id=$1 returning id", [draftStep])).length, 1);
+    });
+    await suite.test("private helpers have fixed search paths and trigger functions are not client-callable", async () => {
+      await admin();
+      const functions = await rows("select proname, proconfig from pg_proc where pronamespace='private'::regnamespace");
+      assert.ok(functions.every((fn) => fn.proconfig?.some((config) => config.startsWith("search_path="))));
+      const permission = await rows("select has_function_privilege('authenticated','private.guard_contribution_update()','EXECUTE') allowed");
+      assert.equal(permission[0].allowed, false);
+    });
+  } finally {
+    await db.close();
+  }
+});

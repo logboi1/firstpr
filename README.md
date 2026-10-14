@@ -2,7 +2,7 @@
 
 Helping newcomers make their first open-source contribution through curated tasks, practical guidance, and mentor support.
 
-**Status: early development.** The project foundation includes a responsive landing page, a custom 404 page, TypeScript, Tailwind CSS, and CI. The contribution platform itself is not implemented yet.
+**Status: early development.** The project includes a responsive landing page, TypeScript, Tailwind CSS, CI, and a tested database migration with access policies. The contribution platform's UI and Supabase authentication integration are not implemented yet.
 
 ## The MVP
 
@@ -32,10 +32,15 @@ Open http://localhost:3000. No credentials or database are required for the foun
 ```sh
 npm run lint
 npm run typecheck
+npm run test:db
 npm run build
 ```
 
-`npm run check` runs all three. For production, build first, then run `npm start`.
+`npm run check` runs all four. For production, build first, then run `npm start`.
+
+## Database
+
+Read [DATABASE.md](docs/DATABASE.md) for the schema, access matrix, local migration setup, role bootstrap, and test limitations. No hosted database is required to run the embedded authorization tests. Fictional fixtures are explicitly labelled and automatic seeding is disabled.
 
 ## Contribute
 
