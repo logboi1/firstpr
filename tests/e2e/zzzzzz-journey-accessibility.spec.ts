@@ -3,6 +3,8 @@ import AxeBuilder from '@axe-core/playwright';
 const stub = 'http://localhost:54329';
 
 async function scan(page: Page, info: TestInfo, name: string) {
+  // Streaming route fallbacks must finish before scanning the actual screen.
+  await expect(page.getByRole('status').filter({ hasText: /^Loading/ })).toHaveCount(0);
   // Full-page WCAG A/AA scans; never exclude controls or disable failing rules.
   const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   await info.attach(`${name}-axe.json`, { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
@@ -41,7 +43,8 @@ test('public pages, keyboard skip link and recoverable failure remain accessible
   await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
   await scan(page, info, 'directory-error');
   await page.getByRole('button', { name: 'Try again', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /unavailable/i })).toHaveCount(0);
+  await expect(page.locator('.opportunity-card').first()).toBeVisible();
+  await scan(page, info, 'directory-recovered');
   await info.attach('public-mobile', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 });
 
