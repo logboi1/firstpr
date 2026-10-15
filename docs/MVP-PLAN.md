@@ -28,7 +28,7 @@ Defer automatic issue discovery, AI matching, chat, payments, certificates, GitH
 
 Next.js App Router, TypeScript, Tailwind CSS, Shadcn UI, Supabase Auth and PostgreSQL, React Hook Form and Zod. Use server-side reads and mutations where appropriate. Add Zustand only if a concrete client state requirement justifies it.
 
-Use email sign-in initially; GitHub OAuth is optional after provider configuration. The account connection used to manage our repository is separate from the application's future GitHub OAuth integration.
+GitHub OAuth sign-in is implemented and requires provider configuration. The account connection used to manage our repository is separate from the application's future GitHub OAuth integration.
 
 Choose and pin supported dependency versions at implementation time. Include an environment example with placeholders and keep real environment files ignored. Hosting is a later decision after the app works locally.
 
@@ -42,7 +42,9 @@ Choose and pin supported dependency versions at implementation time. Include an 
 | `/sign-in` | Authenticate a participant |
 | `/onboarding` | Set display name, skills, and experience |
 | `/dashboard` | Own checklist progress, help requests, and submissions |
-| `/help` | Mentor help queue |
+| `/help` | Own private participant requests |
+| `/help/[id]` | Own request and mentor guidance |
+| `/mentor/help` | Mentor queue and request handling |
 | `/progress` | Opt-in public contribution board |
 | `/admin/opportunities` | Curator opportunity management |
 
@@ -161,7 +163,7 @@ First implementation task after repository access: task 01, followed by task 02.
 
 ## Current implementation status
 
-The foundation adds a Next.js landing page, a 404 page, development scripts, CI, contribution templates, and this plan. The initial database migration and authorization tests are implemented; see `docs/DATABASE.md`. Authentication integration, onboarding, and own-profile editing are implemented. The public opportunity directory includes published cards, combined filters, URL state, and pagination. Task details and saved contribution checklists are implemented. Curator management is implemented. Hosted database setup, mentor support, and the progress board remain pending.
+The foundation adds a Next.js landing page, a 404 page, development scripts, CI, contribution templates, and this plan. The initial database migration and authorization tests are implemented; see `docs/DATABASE.md`. Authentication integration, onboarding, and own-profile editing are implemented. The public opportunity directory includes published cards, combined filters, URL state, and pagination. Task details and saved contribution checklists are implemented. Curator management is implemented. Participant help requests and mentor queue/guidance are implemented. PR submission and verification, the progress board, and hosted pilot validation remain pending.
 
 The landing page describes planned behavior and links to GitHub. It does not contain sample opportunities presented as real ones. No production database or hosted deployment is configured.
 

@@ -8,8 +8,8 @@ Participants can cancel their own open or claimed requests. Resolved and cancell
 
 A successful start RPC records durable task participation before saving a request. It locks against archival and rejects new participants on archived tasks. Existing participants can ask for help on archived tasks. If the later request insert fails, the task remains started and the blocker remains in the form; retrying the request does not erase that participation.
 
-Requests are visible only to their participant and authorized mentors; public-board consent does not expose blockers. Mentor claim, response and resolution UI is a separate backlog item (#9). This feature sends no notifications and does not promise a mentor response.
+Requests are visible only to their participant and authorized mentors; public-board consent does not expose blockers. Mentor claim, guidance and resolution UI is implemented in #9; see [MENTOR-QUEUE.md](MENTOR-QUEUE.md). Open **View request and mentor guidance** to read responses on `/help/[id]`. This feature sends no notifications and does not promise a mentor response.
 
-No additional migration or hosted database change is required. Apply the existing checked-in migrations, including opportunity starts, in the configured development environment.
+The participant creation/list/cancellation workflow uses the existing schema. Reading mentor guidance also requires the additive `20261015115437_mentor_help_queue.sql` migration; apply migrations in the configured development environment before using the new request detail pages.
 
 Validation includes input-boundary tests, allowed/denied PostgreSQL ownership and terminal-state tests, and a browser contract test covering separate accounts, forged ownership/request IDs, claimed cancellation, resolved history, service failures, mobile overflow, and expired-session denial. The contract server uses the actual migrations under authenticated database roles; it does not replace testing actual sessions against a Supabase development project.

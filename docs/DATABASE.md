@@ -30,8 +30,9 @@ Supabase clients must use the public/publishable key plus the participant's vali
 | `checklist_progress` | Completed steps per participant |
 | `help_requests` | Private blockers, mentor assignments, and resolution state |
 | `contributions` | Canonical GitHub PR URLs and curator verification audit |
+| `help_responses` | Immutable private mentor guidance with author/time audit |
 
-All seven tables have RLS enabled. Explicit column grants prevent callers from replacing ownership IDs, timestamps, or verification metadata. All inserts use server-generated IDs and `auth.uid()` for ownership where applicable.
+All application tables have RLS enabled. Explicit column grants prevent callers from replacing ownership IDs, timestamps, or verification metadata. All inserts use server-generated IDs and `auth.uid()` for ownership where applicable.
 
 ## Access matrix
 
@@ -143,3 +144,7 @@ Before a hosted pilot, repeat the access checks through a real Supabase developm
 - [Supabase row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security)
 - [Supabase column privileges](https://supabase.com/docs/guides/database/postgres/column-level-security)
 - [Supabase function security](https://supabase.com/docs/guides/database/functions)
+
+## Mentor queue and guidance
+
+`20261015115437_mentor_help_queue.sql` adds the ninth table, `help_responses`, with own-request/mentor-only reads and insert-only guidance for the currently assigned mentor. A parent-row-locking trigger protects direct API inserts against cancellation and reassignment. Invoker RPCs provide filtered/paginated queue reads, explicit participant-vs-mentor request views, atomic conditional claims/releases, and transactional guidance plus resolution. Functions have fixed search paths and explicit execute grants; no new definer privileges or role grant endpoint are introduced. See [MENTOR-QUEUE.md](MENTOR-QUEUE.md) and [ROLES.md](ROLES.md).
