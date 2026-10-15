@@ -2,7 +2,7 @@
 
 The initial migration is `supabase/migrations/20261014190000_initial_schema.sql`. It creates all seven MVP tables, enums, indexes, constraints, profile bootstrap, RLS policies, column grants, workflow guards, and a narrow public progress RPC.
 
-Issue #3 connects the application using participant sessions; see `AUTHENTICATION.md`. The additive `20261014220000_profile_onboarding.sql` migration adds an own-editable onboarding completion flag without changing authorization roles. No migration has been applied to a hosted database by the assistant.
+Issue #3 connects the application using participant sessions; see `AUTHENTICATION.md`. The additive `20261014220000_profile_onboarding.sql` migration adds an own-editable onboarding completion flag without changing authorization roles. The FirstPR hosted project (`eoziebyvhrgpyreyilcg`) has the initial, onboarding, directory, checklist, curator and mentor migrations applied. Hosted migration history uses provider-generated version IDs; names identify the corresponding checked-in migrations.
 
 ## Apply to Supabase
 
@@ -84,7 +84,7 @@ where id = :request_id and status = 'open'
 returning id;
 ```
 
-One returned row means success. Zero means the request is unavailable or inaccessible; refresh the queue. RLS and transition guards also enforce the assignment restriction. Native PostgreSQL CI tests verify a competing claim waits on the first transaction, then returns zero rows.
+One returned row means success. Zero means the request is unavailable or inaccessible; refresh the queue. RLS and transition guards also enforce the assignment restriction. Native PostgreSQL CI tests verify a competing claim RPC waits on the first transaction, then returns a conflict.
 
 ### PR verification
 
@@ -148,3 +148,7 @@ Before a hosted pilot, repeat the access checks through a real Supabase developm
 ## Mentor queue and guidance
 
 `20261015115437_mentor_help_queue.sql` adds the ninth table, `help_responses`, with own-request/mentor-only reads and insert-only guidance for the currently assigned mentor. A parent-row-locking trigger protects direct API inserts against cancellation and reassignment. Invoker RPCs provide filtered/paginated queue reads, explicit participant-vs-mentor request views, atomic conditional claims/releases, and transactional guidance plus resolution. Functions have fixed search paths and explicit execute grants; no new definer privileges or role grant endpoint are introduced. See [MENTOR-QUEUE.md](MENTOR-QUEUE.md) and [ROLES.md](ROLES.md).
+
+## PR links and stale-review protection
+
+`20261015125206_contribution_links.sql` adds canonical GitHub URL constraints and a unique index on participant plus `lower(pr_url)`, closing case-variant duplicates. It replaces the contribution update timestamp trigger with a fixed-search-path invoker function that guarantees increasing timestamps. Application edits and review decisions include the exact expected timestamp, owner/role scope and lifecycle state; existing RLS and the verification guard remain authoritative. See [CONTRIBUTIONS.md](CONTRIBUTIONS.md).

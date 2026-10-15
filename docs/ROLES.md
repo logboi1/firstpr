@@ -6,7 +6,7 @@ Everyone who signs in is a participant. Mentor and curator are separate addition
 | --- | --- |
 | Participant (default) | Own profile, task checklist, private help requests and guidance |
 | Mentor | Private help queue; claim open requests; send guidance, release or resolve requests assigned to self |
-| Curator | Create/edit/publish/archive opportunities; contribution verification when that UI is implemented |
+| Curator | Create/edit/publish/archive opportunities; manual verification of another participant’s PR status |
 
 Curators do not automatically become mentors. Mentors do not automatically become curators. Neither role can grant roles to other people. Role administration currently requires the Supabase project owner or a trusted database administrator; there is no in-app promotion screen or public role-grant endpoint.
 
