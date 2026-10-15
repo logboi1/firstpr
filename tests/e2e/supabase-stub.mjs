@@ -54,10 +54,13 @@ http.createServer(async (req, res) => {
   if (url.pathname === '/health') return reply({ok:true});
   if (url.pathname === '/reset') {profile = {...profile, display_name:'New contributor', skills:[], onboarding_completed:false, public_board_consent:false}; revoked.clear(); refreshes=0;return reply({ok:true});}
   if (url.pathname === '/stats') return reply({refreshes});
-  if (url.pathname === '/auth/v1/otp') return reply({});
-  if (url.pathname === '/auth/v1/verify') {
-    if (body.token !== '12345678') return reply({msg:'Invalid code', error_code:'otp_expired'},403);
-    return reply(session());
+  if (url.pathname === '/auth/v1/authorize') {
+    const redirectTo = url.searchParams.get('redirect_to');
+    if (!redirectTo) return reply({message:'Missing redirect URL'},400);
+    const destination = new URL(redirectTo);
+    destination.searchParams.set('code','test-code');
+    res.writeHead(302,{location:destination.toString()});
+    return res.end();
   }
   if (url.pathname === '/auth/v1/token') { refreshes++; return reply(session()); }
   const token = req.headers.authorization?.replace('Bearer ', '');

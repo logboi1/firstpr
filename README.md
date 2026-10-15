@@ -2,7 +2,7 @@
 
 Helping newcomers make their first open-source contribution through curated tasks, practical guidance, and mentor support.
 
-**Status: early development.** The project includes a responsive landing page, TypeScript, Tailwind CSS, CI, and a tested database migration with access policies. Email-code sign-in, onboarding, cookie sessions, and own-profile editing are implemented. The public opportunity directory includes search, filters, and pagination. Guided checklists, mentor workflows, and progress tracking UI remain in development.
+**Status: early development.** The project includes a responsive landing page, TypeScript, Tailwind CSS, CI, and a tested database migration with access policies. GitHub OAuth sign-in, onboarding, cookie sessions, and own-profile editing are implemented. The public opportunity directory includes search, filters, and pagination. Guided checklists, mentor workflows, and progress tracking UI remain in development.
 
 ## The MVP
 
@@ -25,7 +25,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. No credentials or database are required for the foundation page. Follow [AUTHENTICATION.md](docs/AUTHENTICATION.md) to configure Supabase, apply migrations, and set up email-code sign-in. Without configuration, account pages and the directory explain their unavailable state. See [OPPORTUNITY-DIRECTORY.md](docs/OPPORTUNITY-DIRECTORY.md) for directory setup and behavior.
+Open http://localhost:3000. No credentials or database are required for the foundation page. Follow [AUTHENTICATION.md](docs/AUTHENTICATION.md) to configure Supabase, apply migrations, and set up GitHub sign-in. Without configuration, account pages and the directory explain their unavailable state. See [OPPORTUNITY-DIRECTORY.md](docs/OPPORTUNITY-DIRECTORY.md) for directory setup and behavior.
 
 ## Checks
 
