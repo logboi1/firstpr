@@ -36,6 +36,7 @@ await directoryDb.exec(`
 let directoryMode = 'normal';
 let helpMode='normal';
 let contributionMode='normal';
+let progressMode='normal';
 const id = '30000000-0000-4000-8000-000000000001';
 const otherId = '30000000-0000-4000-8000-000000000002';
 const curatorId='30000000-0000-4000-8000-000000000003';
@@ -105,6 +106,15 @@ http.createServer(async (req, res) => {
     }
     return reply({ok:true});
   }
+  if(url.pathname==='/progress-control') {
+    if(url.searchParams.get('fixture')==='true') {
+      const task=await directoryDb.transaction(async tx=>{await tx.exec('reset role');
+        const {rows}=await tx.query("insert into public.opportunities(title,summary,skills,contribution_type,difficulty,repository_url,issue_url,setup_notes,status) values('[DEMO] PROGRESS-FIXTURE task','Fictional progress test',ARRAY['Markdown'],'documentation','beginner','https://example.invalid/progress','https://example.invalid/progress/issues/1','Run the fictional tests','published') returning id");
+        const id=rows[0].id;await tx.query("insert into public.checklist_steps(opportunity_id,label,position) values($1,'Read the progress fixture guide',0),($1,'Run the progress fixture tests',1)",[id]);return id;
+      });return reply({task});
+    }
+    progressMode=url.searchParams.get('mode')||'normal';return reply({ok:true});
+  }
   if(url.pathname==='/contribution-control') {contributionMode=url.searchParams.get('mode')||'normal';return reply({ok:true});}
   if(url.pathname==='/rest/v1/contributions') {
     const actor=tokenSubject(req);if(!actor)return reply({message:'Unauthenticated'},401);
@@ -158,7 +168,8 @@ http.createServer(async (req, res) => {
     const actor=tokenSubject(req);
     const rpc=url.pathname.split('/').pop();
     if((helpMode==='mentor-error-once'&&rpc==='list_mentor_help')||(helpMode==='mentor-mutation-error-once'&&rpc==='mentor_help_action')) {helpMode='normal';return reply({message:'Fictional mentor provider failure'},400);}
-    const operations={list_mentor_help:['select public.list_mentor_help($1,$2) as data',[body.page_number,body.queue_filter]],get_help_request:['select public.get_help_request($1,$2,$3) as data',[body.wanted,body.mentor_view,body.response_page]],mentor_help_action:['select public.mentor_help_action($1,$2,$3) as data',[body.wanted,body.action,body.response]],get_opportunity_detail:['select public.get_opportunity_detail($1) as data',[body.wanted]],start_opportunity:['select public.start_opportunity($1) as data',[body.wanted]],set_checklist_step:['select public.set_checklist_step($1,$2,$3) as data',[body.wanted,body.step,body.completed]],save_curator_opportunity:['select public.save_curator_opportunity($1,$2,$3::jsonb,$4) as data',[body.wanted,body.expected_updated_at,JSON.stringify(body.payload),body.publish]],archive_curator_opportunity:['select public.archive_curator_opportunity($1,$2) as data',[body.wanted,body.expected_updated_at]],get_curator_opportunity:['select public.get_curator_opportunity($1) as data',[body.wanted]],list_curator_opportunities:['select public.list_curator_opportunities($1,$2) as data',[body.page_number,body.status_filter]]};
+    if((progressMode==='dashboard-error-once'&&rpc==='get_participant_dashboard')||(progressMode==='board-error-once'&&rpc==='get_public_progress_board')) {progressMode='normal';return reply({message:'Fictional progress failure'},400);}
+    const operations={get_participant_dashboard:['select public.get_participant_dashboard($1) as data',[body.page_number]],get_public_progress_board:['select public.get_public_progress_board($1,$2) as data',[body.page_number,body.status_filter]],list_mentor_help:['select public.list_mentor_help($1,$2) as data',[body.page_number,body.queue_filter]],get_help_request:['select public.get_help_request($1,$2,$3) as data',[body.wanted,body.mentor_view,body.response_page]],mentor_help_action:['select public.mentor_help_action($1,$2,$3) as data',[body.wanted,body.action,body.response]],get_opportunity_detail:['select public.get_opportunity_detail($1) as data',[body.wanted]],start_opportunity:['select public.start_opportunity($1) as data',[body.wanted]],set_checklist_step:['select public.set_checklist_step($1,$2,$3) as data',[body.wanted,body.step,body.completed]],save_curator_opportunity:['select public.save_curator_opportunity($1,$2,$3::jsonb,$4) as data',[body.wanted,body.expected_updated_at,JSON.stringify(body.payload),body.publish]],archive_curator_opportunity:['select public.archive_curator_opportunity($1,$2) as data',[body.wanted,body.expected_updated_at]],get_curator_opportunity:['select public.get_curator_opportunity($1) as data',[body.wanted]],list_curator_opportunities:['select public.list_curator_opportunities($1,$2) as data',[body.page_number,body.status_filter]]};
     if(!operations[rpc]) return reply({message:'Unknown RPC'},404);
     try {const {rows}=await asActor(actor,...operations[rpc]);return reply(rows[0].data||null);}
     catch(error) {return reply({message:error.message,code:error.code},403);}
@@ -206,7 +217,13 @@ http.createServer(async (req, res) => {
   }
   if (url.pathname === '/rest/v1/profiles') {
     if (url.searchParams.get('id') !== `eq.${subject}`) return reply({message:'Wrong owner'},403);
-    if (req.method === 'PATCH') profiles[subject]={...profiles[subject],...body};
+    if (req.method === 'PATCH') {
+      if(progressMode==='consent-error-once'&&Object.hasOwn(body,'public_board_consent')) {progressMode='normal';return reply({message:'Fictional consent failure'},400);}
+      await asActor(subject,`update public.profiles set display_name=coalesce($2,display_name),skills=coalesce($3::text[],skills),
+        experience=coalesce($4::public.experience_level,experience),public_board_consent=coalesce($5,public_board_consent),
+        onboarding_completed=coalesce($6,onboarding_completed) where id=$1`,[subject,body.display_name??null,body.skills??null,body.experience??null,body.public_board_consent??null,body.onboarding_completed??null]);
+      profiles[subject]={...profiles[subject],...body};
+    }
     return reply(profiles[subject]);
   }
   reply({message:'Unexpected endpoint'},404);

@@ -61,8 +61,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
           name="public_board_consent"
           defaultChecked={profile.public_board_consent}
         />{" "}
-        Show my display name and submitted PRs on the public progress board when
-        it launches.
+        Show my display name, PR links, recorded statuses and submission dates on the public progress board.
       </label>
       <p className="field-hint">
         Optional. Your email and help requests stay private. You can change this

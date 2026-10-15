@@ -2,7 +2,7 @@
 
 The initial migration is `supabase/migrations/20261014190000_initial_schema.sql`. It creates all seven MVP tables, enums, indexes, constraints, profile bootstrap, RLS policies, column grants, workflow guards, and a narrow public progress RPC.
 
-Issue #3 connects the application using participant sessions; see `AUTHENTICATION.md`. The additive `20261014220000_profile_onboarding.sql` migration adds an own-editable onboarding completion flag without changing authorization roles. The FirstPR hosted project (`eoziebyvhrgpyreyilcg`) has the initial, onboarding, directory, checklist, curator and mentor migrations applied. Hosted migration history uses provider-generated version IDs; names identify the corresponding checked-in migrations.
+Issue #3 connects the application using participant sessions; see `AUTHENTICATION.md`. The additive `20261014220000_profile_onboarding.sql` migration adds an own-editable onboarding completion flag without changing authorization roles. The FirstPR hosted project (`eoziebyvhrgpyreyilcg`) has the initial, onboarding, directory, checklist, curator and mentor and contribution-link migrations applied. Hosted migration history uses provider-generated version IDs; names identify the corresponding checked-in migrations.
 
 ## Apply to Supabase
 
@@ -152,3 +152,7 @@ Before a hosted pilot, repeat the access checks through a real Supabase developm
 ## PR links and stale-review protection
 
 `20261015125206_contribution_links.sql` adds canonical GitHub URL constraints and a unique index on participant plus `lower(pr_url)`, closing case-variant duplicates. It replaces the contribution update timestamp trigger with a fixed-search-path invoker function that guarantees increasing timestamps. Application edits and review decisions include the exact expected timestamp, owner/role scope and lifecycle state; existing RLS and the verification guard remain authoritative. See [CONTRIBUTIONS.md](CONTRIBUTIONS.md).
+
+## Participant and public progress
+
+`20261015132144_participant_progress.sql` adds invoker-security own-only dashboard aggregates and a narrowly projected definer RPC for public board pagination/counts. Both have fixed search paths and explicit execute grants. The board joins current profile consent for every call and returns no private identity, profile, help or checklist fields. No anonymous table grants are added. See [PROGRESS.md](PROGRESS.md) for count semantics, visibility controls, freshness and tests.
