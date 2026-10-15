@@ -1,0 +1,62 @@
+import {test,expect,type Page} from '@playwright/test';
+async function login(page:Page,account:string) {
+  await page.context().addCookies([{name:'firstpr-test-account',value:account,domain:'localhost',path:'/'}]);
+  await page.goto('/sign-in');await page.getByRole('button',{name:'Continue with GitHub',exact:true}).click();
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByLabel('Display name',{exact:true}).fill(account);
+  await page.getByRole('button',{name:'Save and continue',exact:true}).click();await expect(page).toHaveURL(/\/dashboard$/);
+}
+test('private participant blockers, failed saves, cancellation, terminal states and expired-session denial',async({page,browser,request})=>{
+  test.setTimeout(120000);
+  await request.get('http://localhost:54329/reset');
+  const {task}=await(await request.get('http://localhost:54329/task-control?fixture=2')).json();
+  await page.goto('/help');await expect(page).toHaveURL(/\/sign-in$/);
+  await login(page,'ada');
+  await page.goto('/help');await expect(page.getByRole('heading',{name:'No help requests yet.',exact:true})).toBeVisible();
+  await page.goto(`/opportunities/${task}`);await page.getByRole('link',{name:'Request help',exact:true}).click();
+  const blocker=page.getByLabel('What is blocking you?',{exact:true});
+  await blocker.fill('   ');await page.getByRole('button',{name:'Send help request',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:'Describe what is blocking you'})).toBeVisible();
+  const description='Fictional private blocker: test command fails after installation.\nI tried reinstalling dependencies.';
+  await blocker.fill(description);
+  await request.get('http://localhost:54329/help-control?mode=mutation-error-once');
+  await page.getByRole('button',{name:'Send help request',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:'could not be saved'})).toBeVisible();
+  await expect(blocker).toHaveValue(description);
+  await page.locator('form').evaluate(form=>{for(const [name,value] of [['participant_id','30000000-0000-4000-8000-000000000002'],['status','resolved'],['assigned_mentor_id','30000000-0000-4000-8000-000000000003']]){const input=document.createElement('input');input.name=name;input.value=value;form.append(input);}});
+  await page.getByRole('button',{name:'Send help request',exact:true}).click();
+  await expect(page).toHaveURL(/\/help\?sent=1$/);await expect(page.locator('.help-request')).toHaveCount(1);
+  await expect(page.locator('.help-status')).toHaveText('open');await expect(page.locator('.instruction-text')).toHaveText(description);
+  await page.reload();await expect(page.locator('.instruction-text')).toHaveText(description);
+  const id=await page.locator('input[name="request_id"]').inputValue();
+  const bobContext=await browser.newContext();const bob=await bobContext.newPage();await login(bob,'bob');
+  await bob.goto('/help');await expect(bob.getByRole('heading',{name:'No help requests yet.',exact:true})).toBeVisible();
+  await bob.goto(`/help/new?opportunity=${task}`);await bob.getByLabel('What is blocking you?',{exact:true}).fill('Bob private request');await bob.getByRole('button',{name:'Send help request',exact:true}).click();
+  // Forge another participant's request ID in an otherwise valid server action.
+  await bob.locator('input[name="request_id"]').evaluate((input,id)=>{(input as HTMLInputElement).value=id;},id);
+  await bob.getByRole('button',{name:'Cancel request',exact:true}).click();
+  await expect(bob.getByRole('alert').filter({hasText:'could not be cancelled'})).toBeVisible();
+  await page.reload();await expect(page.locator('.help-status')).toHaveText('open');
+  await request.get(`http://localhost:54329/help-control?status=claimed&id=${id}`);
+  await page.reload();await expect(page.locator('.help-status')).toHaveText('claimed');
+  await page.getByRole('button',{name:'Cancel request',exact:true}).click();await expect(page.locator('.help-status')).toHaveText('cancelled');
+  await expect(page.getByRole('button',{name:'Cancel request',exact:true})).toHaveCount(0);
+  await page.reload();await expect(page.locator('.help-status')).toHaveText('cancelled');
+  await page.goto(`/help/new?opportunity=${task}`);await blocker.fill('Resolved fixture');await page.getByRole('button',{name:'Send help request',exact:true}).click();
+  const resolved=await page.locator('input[name="request_id"]').inputValue();
+  await request.get(`http://localhost:54329/help-control?status=resolved&id=${resolved}`);
+  await page.reload();await expect(page.locator('.help-status').filter({hasText:'resolved'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Cancel request',exact:true})).toHaveCount(0);
+  // Mentor RLS sees the queue, but this participant screen still lists only their own.
+  const mentorContext=await browser.newContext();const mentor=await mentorContext.newPage();await login(mentor,'curator');
+  await mentor.goto('/help');await expect(mentor.getByRole('heading',{name:'No help requests yet.',exact:true})).toBeVisible();
+  await request.get('http://localhost:54329/help-control?mode=error-once');await page.goto('/help');
+  await expect(page.getByRole('heading',{name:'Help requests unavailable.',exact:true})).toBeVisible();await page.getByRole('button',{name:'Try again',exact:true}).click();
+  await expect(page.locator('.help-request')).toHaveCount(2);
+  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  await page.goto(`/help/new?opportunity=${task}`);await blocker.fill('Keep this blocker after logout');
+  const logout=await page.context().newPage();await logout.goto('/dashboard');await logout.getByRole('button',{name:'Sign out',exact:true}).click();
+  await page.getByRole('button',{name:'Send help request',exact:true}).click();await expect(page.getByRole('alert').filter({hasText:'session has expired'})).toBeVisible();await expect(blocker).toHaveValue('Keep this blocker after logout');
+  await page.goto('/help');await expect(page).toHaveURL(/\/sign-in$/);
+  await bobContext.close();await mentorContext.close();
+});

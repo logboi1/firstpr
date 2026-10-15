@@ -33,6 +33,7 @@ await directoryDb.exec(`
   set role anon;
 `);
 let directoryMode = 'normal';
+let helpMode='normal';
 const id = '30000000-0000-4000-8000-000000000001';
 const otherId = '30000000-0000-4000-8000-000000000002';
 const curatorId='30000000-0000-4000-8000-000000000003';
@@ -76,11 +77,49 @@ http.createServer(async (req, res) => {
     const fixture=await directoryDb.transaction(async tx=>{
       await tx.exec('reset role');
       const {rows}=await tx.query("select id from public.opportunities where title='[DEMO] Documentation task 1'");
-      const task=rows[0].id;
+      const task=url.searchParams.get('fixture')==='2' ? (await tx.query("select id from public.opportunities where title='[DEMO] Documentation task 2'")).rows[0].id : rows[0].id;
       if(url.searchParams.get('archive')==='true') await tx.query("update public.opportunities set status='archived' where id=$1",[task]);
       return {task,steps:['20000000-0000-4000-8000-000000000011','20000000-0000-4000-8000-000000000012']};
     });
     return reply(fixture);
+  }
+  if(url.pathname==='/help-control') {
+    if(url.searchParams.has('mode')) helpMode=url.searchParams.get('mode');
+    const status=url.searchParams.get('status');
+    if(status) {
+      await directoryDb.transaction(async tx=>{await tx.exec('reset role');await tx.query("insert into public.user_roles(user_id,role) values($1,'mentor') on conflict do nothing",[curatorId]);});
+      const wanted=url.searchParams.get('id');
+      if(status==='claimed'||status==='resolved') await asActor(curatorId,"update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 and status='open'",[wanted]);
+      if(status==='resolved') await asActor(curatorId,"update public.help_requests set status='resolved' where id=$1 and status='claimed'",[wanted]);
+    }
+    return reply({ok:true});
+  }
+  if(url.pathname==='/rest/v1/help_requests') {
+    const actor=tokenSubject(req);
+    if(!actor) return reply({message:'Unauthenticated'},401);
+    if(helpMode==='error-once'||(helpMode==='mutation-error-once'&&req.method!=='GET')) {const status=helpMode==='error-once' ? 400 : 503;helpMode='normal';return reply({message:'Fictional help provider failure'},status);}
+    try {
+      if(req.method==='POST') {
+        await asActor(actor,'insert into public.help_requests(opportunity_id,blocker) values($1,$2)',[body.opportunity_id,body.blocker]);
+        return reply(null,201);
+      }
+      // Match the application's explicit participant scope, including for mentors.
+      const owner=url.searchParams.get('participant_id')?.replace(/^eq\./,'');
+      if(owner!==actor) return reply({message:'Missing own-participant filter'},403);
+      if(req.method==='PATCH') {
+        const wanted=url.searchParams.get('id')?.replace(/^eq\./,'');
+        const {rows}=await asActor(actor,"update public.help_requests set status=$1 where id=$2 and participant_id=$3 and status in ('open','claimed') returning id",[body.status,wanted,owner]);
+        return reply(rows);
+      }
+      const offset=Number(url.searchParams.get('offset')||0);
+      const limit=Number(url.searchParams.get('limit')||20);
+      const {rows}=await asActor(actor,`select h.id,h.opportunity_id,h.blocker,h.status,h.created_at,h.updated_at,
+        case when o.id is null then null else jsonb_build_object('title',o.title) end as opportunities
+        from public.help_requests h left join public.opportunities o on o.id=h.opportunity_id
+        where h.participant_id=$1 order by h.created_at desc,h.id desc limit $2 offset $3`,[owner,limit,offset]);
+      const total=(await asActor(actor,'select count(*)::int as total from public.help_requests where participant_id=$1',[owner])).rows[0].total;
+      res.writeHead(200,{'content-type':'application/json','content-range':`${offset}-${offset+rows.length-1}/${total}`});return res.end(JSON.stringify(rows));
+    } catch(error) {return reply({message:error.message,code:error.code},403);}
   }
   if(url.pathname.startsWith('/rest/v1/rpc/') && url.pathname!=='/rest/v1/rpc/browse_opportunities') {
     const actor=tokenSubject(req);
