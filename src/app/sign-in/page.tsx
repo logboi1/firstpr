@@ -17,7 +17,7 @@ export default async function SignIn({
     if (data.user) redirect("/dashboard");
   }
   return (
-    <AccountShell>
+    <AccountShell publicNavigation>
       <section className="account-card">
         <p className="eyebrow">YOUR FIRST STEP</p>
         <h1>Welcome to FirstPR.</h1>
