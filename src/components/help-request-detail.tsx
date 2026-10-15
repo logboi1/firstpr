@@ -5,7 +5,7 @@ import type { RequestDetail } from "@/lib/mentor/validation";
 export function HelpRequestDetail({request,mentor=false}:{request:RequestDetail;mentor?:boolean}) {
   const base = mentor ? "/mentor/help" : "/help";
   const active = request.status === "open" || request.status === "claimed";
-  return <article className="account-card help-request"><Link className="back-link" href={base}>← {mentor ? "Back to mentor queue" : "My help requests"}</Link><p className="eyebrow">PRIVATE HELP REQUEST</p><h1>{request.title ?? "Task help request"}</h1><p className="help-status">{request.status}{request.status === "claimed" ? request.assigned_to_you ? " · Assigned to you" : " · Assigned to a mentor" : ""}</p>
+  return <article className="account-card help-request"><Link className="back-link" href={base}>← {mentor ? "Back to mentor queue" : "My help requests"}</Link><p className="eyebrow">PRIVATE HELP REQUEST</p><h1>{request.title ?? "Task help request"}</h1><p className="help-status" data-status={request.status}>{request.status}{request.status === "claimed" ? request.assigned_to_you ? " · Assigned to you" : " · Assigned to a mentor" : ""}</p>
     {request.title ? <Link className="back-link" href={`/opportunities/${request.opportunity_id}`}>View task instructions →</Link> : <p className="field-hint">Task instructions are restricted or unavailable. The blocker and guidance remain accessible here.</p>}
     <h2>Participant blocker</h2><p className="instruction-text">{request.blocker}</p>
     <p className="field-hint">Requested <time dateTime={request.created_at}>{new Date(request.created_at).toISOString().slice(0,10)}</time> (UTC)</p>

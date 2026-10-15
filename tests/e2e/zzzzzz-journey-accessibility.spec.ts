@@ -7,6 +7,9 @@ async function scan(page: Page, info: TestInfo, name: string) {
   await expect(page.getByRole('status').filter({ hasText: /^Loading/ })).toHaveCount(0);
   // Full-page WCAG A/AA scans; never exclude controls or disable failing rules.
   const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+  if (['home-desktop', 'directory', 'onboarding', 'profile', 'help-form', 'mentor-response', 'curator-editor', 'curator-review', 'participant-mobile-dashboard'].includes(name)) {
+    await info.attach(`${name}-screen`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+  }
   await info.attach(`${name}-axe.json`, { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
   expect.soft(result.violations.map(({ id, nodes }) => ({ id, elements: nodes.map(node => node.html) })), name).toEqual([]);
   await expect(page.getByRole('main')).toHaveCount(1);

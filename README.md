@@ -42,6 +42,10 @@ npm run build
 
 Read [DATABASE.md](docs/DATABASE.md) for the schema, access matrix, local migration setup, role bootstrap, and test limitations. No hosted database is required to run the embedded authorization tests. Fictional fixtures are explicitly labelled and automatic seeding is disabled.
 
+## Design
+
+The app uses a shared retro workshop design with accessible native controls and an original branch/commit logo. See [DESIGN.md](docs/DESIGN.md) for the component system, brand assets and visual checks.
+
 ## Contribute
 
 Start with [CONTRIBUTING.md](CONTRIBUTING.md), check the issues, and keep each PR focused. Documentation, design, testing, and code contributions are welcome.
