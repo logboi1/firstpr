@@ -68,7 +68,7 @@ test("FirstPR migration and database access boundaries", async (suite) => {
   try {
     await suite.test("migration enables RLS on every app table", async () => {
       const tables = await rows("select relname, relrowsecurity from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'");
-      assert.equal(tables.length, 8);
+      assert.equal(tables.length, 9);
       assert.ok(tables.every((table) => table.relrowsecurity));
     });
     await suite.test("signup creates a private profile without trusting metadata roles or consent", async () => {
@@ -88,7 +88,7 @@ test("FirstPR migration and database access boundaries", async (suite) => {
     });
     await suite.test("visitors cannot read any private table or write public opportunities", async () => {
       await actor();
-      for (const table of ["profiles", "user_roles", "opportunity_participations", "checklist_progress", "help_requests", "contributions"]) {
+      for (const table of ["profiles", "user_roles", "opportunity_participations", "checklist_progress", "help_requests", "help_responses", "contributions"]) {
         await denied(`select * from public.${table}`);
       }
       await denied("update public.opportunities set title='tampered'");
@@ -207,9 +207,9 @@ test("FirstPR migration and database access boundaries", async (suite) => {
           await client.query("set role authenticated");
           await client.query("begin");
         }
-        const claim = "update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 and status='open' returning id";
+        const claim = "select public.mentor_help_action($1,'claim') as id";
         assert.equal((await first.query(claim, [id])).rows.length, 1);
-        pending = second.query(claim, [id]);
+        pending = second.query(claim, [id]).then(result=>({result}),error=>({error}));
         // Confirm a real lock wait before releasing the first transaction.
         await admin();
         let blocked = false;
@@ -220,8 +220,8 @@ test("FirstPR migration and database access boundaries", async (suite) => {
         }
         assert.ok(blocked, "second claim should wait on the first transaction's row lock");
         await first.query("commit");
-        assert.equal((await pending).rows.length, 0);
-        await second.query("commit");
+        assert.equal((await pending).error.code, "40001");
+        await second.query("rollback");
         assert.equal((await rows("select assigned_mentor_id from public.help_requests where id=$1", [id]))[0].assigned_mentor_id, ids.mentor);
       } finally {
         await first.query("rollback");
@@ -280,6 +280,61 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       assert.equal((await rows("update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 and status='open' returning id",[id])).length,0);
       assert.equal((await rows("update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 returning id",[id])).length,0);
       assert.equal((await rows("update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 and status='open' returning id",[helpId])).length,0);
+    });
+
+    await suite.test("mentor RPCs and immutable guidance enforce live roles, assignment, privacy and terminal states", async () => {
+      await actor('alice');
+      const id=(await rows("insert into public.help_requests(opportunity_id,blocker) values($1,'Mentor guidance fixture') returning id",[opportunity]))[0].id;
+      await denied("select public.list_mentor_help(1,'all')");
+      await denied("select public.mentor_help_action($1,'claim')",[id]);
+      await denied("select public.get_help_request($1,true,1)",[id]);
+      await actor('bob');
+      assert.equal((await rows('select public.get_help_request($1,false,1) as data',[id]))[0].data,null);
+      await denied("insert into public.help_responses(help_request_id,body) values($1,'forged response')",[id]);
+      await actor('mentor');
+      await denied("select public.list_mentor_help(1,'invalid')",[],'22023');
+      const queue=(await rows("select public.list_mentor_help(999999,'open') as data"))[0].data;
+      assert.ok(queue.items.some(item=>item.id===id)); assert.equal(queue.page,queue.pages);
+      assert.equal(queue.items.find(item=>item.id===id).participant_id,undefined);
+      await rows("select public.mentor_help_action($1,'claim')",[id]);
+      await denied("select public.mentor_help_action($1,'resolve',' ')",[id],'22023');
+      await denied("insert into public.help_responses(help_request_id,body,mentor_id) values($1,'fake',$2)",[id,ids.otherMentor]);
+      await rows("select public.mentor_help_action($1,'respond','  Try the documented Node version.  ')",[id]);
+      const note=(await rows('select * from public.help_responses where help_request_id=$1',[id]))[0];
+      assert.equal(note.body,'Try the documented Node version.');assert.equal(note.mentor_id,ids.mentor);
+      await denied("update public.help_responses set body='rewritten' where id=$1",[note.id]);
+      await denied('delete from public.help_responses where id=$1',[note.id]);
+      assert.equal((await rows('select public.get_help_request($1,false,1) as data',[id]))[0].data,null);
+      await actor('otherMentor');
+      for(const action of ['claim','release','respond','resolve']) await denied('select public.mentor_help_action($1,$2,$3)',[id,action,'Unassigned response'],'40001');
+      await actor('alice');
+      const own=(await rows('select public.get_help_request($1,false,1) as data',[id]))[0].data;
+      assert.equal(own.responses[0].body,note.body);assert.equal(own.responses[0].mentor_id,undefined);
+      await actor('bob');assert.equal((await rows('select * from public.help_responses where help_request_id=$1',[id])).length,0);
+      await actor('curator');assert.equal((await rows('select * from public.help_responses where help_request_id=$1',[id])).length,0);
+      await denied("select public.list_mentor_help(1,'all')");
+      await actor('mentor');await rows("select public.mentor_help_action($1,'release')",[id]);
+      await denied("insert into public.help_responses(help_request_id,body) values($1,'after release')",[id],'40001');
+      await actor('otherMentor');await rows("select public.mentor_help_action($1,'claim')",[id]);
+      await admin();await db.query("delete from public.user_roles where user_id=$1 and role='mentor'",[ids.otherMentor]);
+      await actor('otherMentor');await denied("select public.mentor_help_action($1,'respond','Revoked role')",[id]);
+      assert.equal((await rows('select * from public.help_responses where help_request_id=$1',[id])).length,0);
+      await admin();await db.query("insert into public.user_roles(user_id,role) values($1,'mentor')",[ids.otherMentor]);
+      await actor('otherMentor');await rows("select public.mentor_help_action($1,'resolve','The version mismatch is addressed.')",[id]);
+      await actor('alice');const done=(await rows('select public.get_help_request($1,false,1) as data',[id]))[0].data;
+      assert.equal(done.status,'resolved');assert.equal(done.responses.length,2);
+      assert.equal((await rows("update public.help_requests set status='cancelled' where id=$1 returning id",[id])).length,0);
+      await actor('otherMentor');await denied("select public.mentor_help_action($1,'respond','after resolution')",[id],'40001');
+      await actor('alice');const cancelled=(await rows("insert into public.help_requests(opportunity_id,blocker) values($1,'Cancelled response fixture') returning id",[opportunity]))[0].id;
+      await actor('mentor');await rows("select public.mentor_help_action($1,'claim')",[cancelled]);
+      await actor('alice');await rows("update public.help_requests set status='cancelled' where id=$1",[cancelled]);
+      await actor('mentor');await denied("select public.mentor_help_action($1,'resolve','stale response')",[cancelled],'40001');
+      assert.equal((await rows('select * from public.help_responses where help_request_id=$1',[cancelled])).length,0);
+      await admin();
+      const functions=await rows("select proname,prosecdef,proconfig from pg_proc where proname in ('mentor_help_action','list_mentor_help','get_help_request','guard_help_response')");
+      assert.equal(functions.length,4);assert.ok(functions.every(fn=>!fn.prosecdef&&fn.proconfig.some(value=>value.startsWith('search_path='))));
+      assert.equal((await rows("select has_function_privilege('anon','public.list_mentor_help(integer,text)','EXECUTE') allowed"))[0].allowed,false);
+      assert.equal((await rows("select has_function_privilege('authenticated','private.guard_help_response()','EXECUTE') allowed"))[0].allowed,false);
     });
 
     let contributionId;

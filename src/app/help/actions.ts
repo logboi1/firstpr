@@ -45,5 +45,8 @@ export async function cancelHelp(_previous: HelpState, form: FormData): Promise<
     return { error: "We could not reach the help service. Try again." };
   }
   revalidatePath("/help");
+  revalidatePath(`/help/${id.data}`);
+  revalidatePath("/mentor/help");
+  revalidatePath(`/mentor/help/${id.data}`);
   return { message: "Request cancelled." };
 }

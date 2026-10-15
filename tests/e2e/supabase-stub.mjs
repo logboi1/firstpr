@@ -23,8 +23,9 @@ await directoryDb.exec(`
     'https://example.invalid/ui','https://example.invalid/ui/issues/1','Fictional setup','published'),
     ('[DEMO] Secret draft','Not public',ARRAY['DraftOnly'],'code','beginner','https://example.invalid/draft','https://example.invalid/draft/1','','draft'),
     ('[DEMO] Archived task','Not public',ARRAY['ArchivedOnly'],'code','beginner','https://example.invalid/archive','https://example.invalid/archive/1','Fictional setup','archived');
-  insert into auth.users(id) values ('30000000-0000-4000-8000-000000000001'),('30000000-0000-4000-8000-000000000002'),('30000000-0000-4000-8000-000000000003');
+  insert into auth.users(id) values ('30000000-0000-4000-8000-000000000001'),('30000000-0000-4000-8000-000000000002'),('30000000-0000-4000-8000-000000000003'),('30000000-0000-4000-8000-000000000004'),('30000000-0000-4000-8000-000000000005');
   insert into public.user_roles(user_id,role) values ('30000000-0000-4000-8000-000000000003','curator');
+  insert into public.user_roles(user_id,role) values ('30000000-0000-4000-8000-000000000004','mentor'),('30000000-0000-4000-8000-000000000005','mentor');
   update public.opportunities set prerequisites='Read the fictional contribution guide',setup_notes=E'Install dependencies\nRun the tests' where title='[DEMO] Documentation task 1';
   insert into public.checklist_steps(id,opportunity_id,label,position)
     select '20000000-0000-4000-8000-000000000011'::uuid,id,'Read the contribution guide',0 from public.opportunities where title='[DEMO] Documentation task 1';
@@ -37,7 +38,9 @@ let helpMode='normal';
 const id = '30000000-0000-4000-8000-000000000001';
 const otherId = '30000000-0000-4000-8000-000000000002';
 const curatorId='30000000-0000-4000-8000-000000000003';
-const users = Object.fromEntries([[id,'ada@example.com'],[otherId,'bob@example.com'],[curatorId,'curator@example.com']].map(([id,email])=>[id,{id,aud:'authenticated',role:'authenticated',email,app_metadata:{},user_metadata:{},created_at:'2026-10-14T00:00:00Z'}]));
+const mentorId='30000000-0000-4000-8000-000000000004';
+const secondMentorId='30000000-0000-4000-8000-000000000005';
+const users = Object.fromEntries([[id,'ada@example.com'],[otherId,'bob@example.com'],[curatorId,'curator@example.com'],[mentorId,'mentor@example.com'],[secondMentorId,'mentor-two@example.com']].map(([id,email])=>[id,{id,aud:'authenticated',role:'authenticated',email,app_metadata:{},user_metadata:{},created_at:'2026-10-14T00:00:00Z'}]));
 const defaultProfile = { display_name:'New contributor',skills:[],experience:'beginner',public_board_consent:false,onboarding_completed:false };
 let profiles = Object.fromEntries(Object.keys(users).map(id=>[id,{...defaultProfile,id}]));
 let refreshes=0;
@@ -83,6 +86,13 @@ http.createServer(async (req, res) => {
     });
     return reply(fixture);
   }
+  if(url.pathname==='/mentor-control') {
+    const subject=url.searchParams.get('account')==='mentor-two' ? secondMentorId : url.searchParams.get('account')==='curator' ? curatorId : mentorId;
+    await directoryDb.transaction(async tx=>{await tx.exec('reset role');
+      if(url.searchParams.get('enabled')==='false') await tx.query("delete from public.user_roles where user_id=$1 and role='mentor'",[subject]);
+      else await tx.query("insert into public.user_roles(user_id,role) values($1,'mentor') on conflict do nothing",[subject]);
+    });return reply({ok:true});
+  }
   if(url.pathname==='/help-control') {
     if(url.searchParams.has('mode')) helpMode=url.searchParams.get('mode');
     const status=url.searchParams.get('status');
@@ -124,7 +134,8 @@ http.createServer(async (req, res) => {
   if(url.pathname.startsWith('/rest/v1/rpc/') && url.pathname!=='/rest/v1/rpc/browse_opportunities') {
     const actor=tokenSubject(req);
     const rpc=url.pathname.split('/').pop();
-    const operations={get_opportunity_detail:['select public.get_opportunity_detail($1) as data',[body.wanted]],start_opportunity:['select public.start_opportunity($1) as data',[body.wanted]],set_checklist_step:['select public.set_checklist_step($1,$2,$3) as data',[body.wanted,body.step,body.completed]],save_curator_opportunity:['select public.save_curator_opportunity($1,$2,$3::jsonb,$4) as data',[body.wanted,body.expected_updated_at,JSON.stringify(body.payload),body.publish]],archive_curator_opportunity:['select public.archive_curator_opportunity($1,$2) as data',[body.wanted,body.expected_updated_at]],get_curator_opportunity:['select public.get_curator_opportunity($1) as data',[body.wanted]],list_curator_opportunities:['select public.list_curator_opportunities($1,$2) as data',[body.page_number,body.status_filter]]};
+    if((helpMode==='mentor-error-once'&&rpc==='list_mentor_help')||(helpMode==='mentor-mutation-error-once'&&rpc==='mentor_help_action')) {helpMode='normal';return reply({message:'Fictional mentor provider failure'},400);}
+    const operations={list_mentor_help:['select public.list_mentor_help($1,$2) as data',[body.page_number,body.queue_filter]],get_help_request:['select public.get_help_request($1,$2,$3) as data',[body.wanted,body.mentor_view,body.response_page]],mentor_help_action:['select public.mentor_help_action($1,$2,$3) as data',[body.wanted,body.action,body.response]],get_opportunity_detail:['select public.get_opportunity_detail($1) as data',[body.wanted]],start_opportunity:['select public.start_opportunity($1) as data',[body.wanted]],set_checklist_step:['select public.set_checklist_step($1,$2,$3) as data',[body.wanted,body.step,body.completed]],save_curator_opportunity:['select public.save_curator_opportunity($1,$2,$3::jsonb,$4) as data',[body.wanted,body.expected_updated_at,JSON.stringify(body.payload),body.publish]],archive_curator_opportunity:['select public.archive_curator_opportunity($1,$2) as data',[body.wanted,body.expected_updated_at]],get_curator_opportunity:['select public.get_curator_opportunity($1) as data',[body.wanted]],list_curator_opportunities:['select public.list_curator_opportunities($1,$2) as data',[body.page_number,body.status_filter]]};
     if(!operations[rpc]) return reply({message:'Unknown RPC'},404);
     try {const {rows}=await asActor(actor,...operations[rpc]);return reply(rows[0].data||null);}
     catch(error) {return reply({message:error.message,code:error.code},403);}
@@ -146,7 +157,7 @@ http.createServer(async (req, res) => {
     const redirectTo=url.searchParams.get('redirect_to');
     if(!redirectTo) return reply({message:'Missing redirect URL'},400);
     const account=req.headers.cookie?.match(/(?:^|; )firstpr-test-account=([^;]+)/)?.[1];
-    const subject=account==='curator' ? curatorId : account==='bob' ? otherId : id;
+    const subject=account==='mentor' ? mentorId : account==='mentor-two' ? secondMentorId : account==='curator' ? curatorId : account==='bob' ? otherId : id;
     const destination=new URL(redirectTo);
     destination.searchParams.set('code',subject);
     res.writeHead(302,{location:destination.toString()});return res.end();
@@ -167,7 +178,8 @@ http.createServer(async (req, res) => {
   if (url.pathname === '/auth/v1/logout') {revoked.add(token);return reply({});}
   if (url.pathname === '/rest/v1/user_roles') {
     if(url.searchParams.get('user_id')!==`eq.${subject}`) return reply({message:'Wrong owner'},403);
-    const {rows}=await asActor(subject,"select role from public.user_roles where user_id=$1 and role='curator'",[subject]);return reply(rows);
+    const role=url.searchParams.get('role')?.replace(/^eq\./,'');
+    const {rows}=await asActor(subject,'select role from public.user_roles where user_id=$1 and role=$2',[subject,role]);return reply(rows);
   }
   if (url.pathname === '/rest/v1/profiles') {
     if (url.searchParams.get('id') !== `eq.${subject}`) return reply({message:'Wrong owner'},403);

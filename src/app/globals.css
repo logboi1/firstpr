@@ -174,3 +174,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .account-form textarea { font:inherit; width:100%; min-width:0; border:1px solid #ced8c8; border-radius:8px; padding:.8rem; background:white; color:inherit; resize:vertical; }
 
 @media (max-width:680px) { .account-header { flex-wrap:wrap; padding-block:20px; } .account-header nav { flex-wrap:wrap; gap:16px; } }
+
+.mentor-note { border-left:3px solid var(--green); padding:0 1rem; overflow-wrap:anywhere; }
+.help-request h1 { font-size:clamp(2rem,5vw,3rem); overflow-wrap:anywhere; }
