@@ -24,7 +24,7 @@ export default function Home() {
             <div className="actions"><Link className="button primary" href="/opportunities">Find your first task <span aria-hidden="true">↗</span></Link><a className="button secondary" href="#how-it-works">Explore the idea <span aria-hidden="true">↓</span></a></div>
             <p className="availability">In development · Browse tasks and create your profile. Save checklist progress as you contribute.</p>
           </div>
-          <div className="journey" aria-label="Preview of the planned contribution journey">
+          <div className="journey" role="group" aria-label="Preview of the planned contribution journey">
             <div className="journey-top"><span className="mini-brand">↗ FIRST STEPS</span><span className="preview-label">CONCEPT PREVIEW</span></div>
             <h2>Small steps.<br/>Real contributions.</h2>
             <p className="journey-intro">A clearer path into open source.</p>
