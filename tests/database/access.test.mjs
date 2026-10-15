@@ -350,6 +350,32 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       await denied("update public.contributions set status='merged' where id=$1", [contributionId]);
       await denied("update public.contributions set verifier_id=$1 where id=$2", [ids.curator, contributionId]);
     });
+    await suite.test("canonical PR constraints reject case-variant duplicates and malformed repository paths",async()=>{
+      await actor('alice');
+      await denied("insert into public.contributions(opportunity_id,pr_url) values($1,'https://github.com/FIRSTPR-DEMO/DOCS/pull/1')",[opportunity],'23505');
+      for(const url of ['https://github.com/demo/../pull/1','https://github.com/demo/./pull/1','https://github.com/-invalid/docs/pull/1','https://github.com/demo/docs/pull/01','https://github.com/demo/docs/pull/1?x=y'])await denied('insert into public.contributions(opportunity_id,pr_url) values($1,$2)',[opportunity,url],'23514');
+    });
+    await suite.test("conditional PR edits reject stale versions and verification stores/clears trusted audit",async()=>{
+      await actor('alice');
+      const item=(await rows("insert into public.contributions(opportunity_id,pr_url) values($1,'https://github.com/firstpr-demo/review/pull/99') returning id,updated_at::text as updated_at",[opportunity]))[0];
+      const version=item.updated_at;
+      const updated=(await rows("update public.contributions set pr_url='https://github.com/firstpr-demo/review/pull/100' where id=$1 and participant_id=auth.uid() and status='submitted' and updated_at=$2 returning updated_at::text as updated_at",[item.id,version]))[0].updated_at;
+      assert.notEqual(updated,version);
+      await actor('curator');
+      assert.equal((await rows("update public.contributions set status='merged' where id=$1 and participant_id<>auth.uid() and updated_at=$2 returning id",[item.id,version])).length,0);
+      const verified=(await rows("update public.contributions set status='merged' where id=$1 and participant_id<>auth.uid() and updated_at=$2 returning verifier_id,verified_at,updated_at",[item.id,updated]))[0];
+      assert.equal(verified.verifier_id,ids.curator);assert.ok(verified.verified_at);
+      await actor('alice');await denied("update public.contributions set verifier_id=$1 where id=$2",[ids.alice,item.id]);
+      assert.equal((await rows("update public.contributions set pr_url='https://github.com/firstpr-demo/review/pull/101' where id=$1 and status='submitted' returning id",[item.id])).length,0);
+      await admin();await db.query("delete from public.user_roles where user_id=$1 and role='curator'",[ids.curator]);
+      await actor('curator');assert.equal((await rows("update public.contributions set status='closed' where id=$1 returning id",[item.id])).length,0);
+      await admin();await db.query("insert into public.user_roles(user_id,role) values($1,'curator')",[ids.curator]);
+      await actor('curator');await rows("update public.contributions set status='closed' where id=$1",[item.id]);
+      const reset=(await rows("update public.contributions set status='submitted' where id=$1 returning verifier_id,verified_at",[item.id]))[0];
+      assert.equal(reset.verifier_id,null);assert.equal(reset.verified_at,null);
+      await actor('alice');await rows("update public.contributions set pr_url='https://github.com/firstpr-demo/review/pull/101' where id=$1 and status='submitted' returning id",[item.id]);
+      await admin();await db.query('delete from public.contributions where id=$1',[item.id]);
+    });
     await suite.test("other participants and mentors cannot read or verify contributions", async () => {
       for (const name of ["bob", "mentor"]) {
         await actor(name);

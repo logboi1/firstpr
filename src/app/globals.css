@@ -177,3 +177,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 
 .mentor-note { border-left:3px solid var(--green); padding:0 1rem; overflow-wrap:anywhere; }
 .help-request h1 { font-size:clamp(2rem,5vw,3rem); overflow-wrap:anywhere; }
+
+.pr-link { display:inline-block; max-width:100%; overflow-wrap:anywhere; }
+.verification-audit { color:var(--green); font-size:.9rem; }

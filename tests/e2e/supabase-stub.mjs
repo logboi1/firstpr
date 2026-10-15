@@ -35,6 +35,7 @@ await directoryDb.exec(`
 `);
 let directoryMode = 'normal';
 let helpMode='normal';
+let contributionMode='normal';
 const id = '30000000-0000-4000-8000-000000000001';
 const otherId = '30000000-0000-4000-8000-000000000002';
 const curatorId='30000000-0000-4000-8000-000000000003';
@@ -103,6 +104,28 @@ http.createServer(async (req, res) => {
       if(status==='resolved') await asActor(curatorId,"update public.help_requests set status='resolved' where id=$1 and status='claimed'",[wanted]);
     }
     return reply({ok:true});
+  }
+  if(url.pathname==='/contribution-control') {contributionMode=url.searchParams.get('mode')||'normal';return reply({ok:true});}
+  if(url.pathname==='/rest/v1/contributions') {
+    const actor=tokenSubject(req);if(!actor)return reply({message:'Unauthenticated'},401);
+    if(contributionMode==='error-once'||(contributionMode==='mutation-error-once'&&req.method!=='GET')) {contributionMode='normal';return reply({message:'Fictional submission failure'},400);}
+    try {
+      if(req.method==='POST') {await asActor(actor,'insert into public.contributions(opportunity_id,pr_url) values($1,$2)',[body.opportunity_id,body.pr_url]);return reply(null,201);}
+      const owner=url.searchParams.get('participant_id')?.replace(/^(eq|neq)\./,'');
+      if(req.method==='PATCH') {
+        const wanted=url.searchParams.get('id')?.replace(/^eq\./,'');const version=url.searchParams.get('updated_at')?.replace(/^eq\./,'');
+        const operation=Object.hasOwn(body,'pr_url') ? ["update public.contributions set pr_url=$1 where id=$2 and participant_id=$3 and opportunity_id=$4 and status='submitted' and updated_at=$5::timestamptz returning id",[body.pr_url,wanted,owner,url.searchParams.get('opportunity_id')?.replace(/^eq\./,''),version]] : ["update public.contributions set status=$1 where id=$2 and participant_id<>$3 and updated_at=$4::timestamptz and status<>$1 returning id",[body.status,wanted,owner,version]];
+        const {rows}=await asActor(actor,...operation);return reply(rows);
+      }
+      const status=url.searchParams.get('status')?.replace(/^eq\./,'')||null;const offset=Number(url.searchParams.get('offset')||0);const limit=Number(url.searchParams.get('limit')||20);
+      const {rows}=await asActor(actor,`select c.id,c.opportunity_id,c.participant_id,c.pr_url,c.status,c.verifier_id,to_jsonb(c)->>'verified_at' as verified_at,to_jsonb(c)->>'created_at' as created_at,to_jsonb(c)->>'updated_at' as updated_at,
+        case when o.id is null then null else jsonb_build_object('title',o.title) end as opportunities
+        from public.contributions c left join public.opportunities o on o.id=c.opportunity_id
+        where ($1::uuid is null or c.participant_id=$1) and ($2::text is null or c.status::text=$2)
+        order by c.created_at desc,c.id desc limit $3 offset $4`,[owner||null,status,limit,offset]);
+      const total=(await asActor(actor,'select count(*)::int as total from public.contributions where ($1::uuid is null or participant_id=$1) and ($2::text is null or status::text=$2)',[owner||null,status])).rows[0].total;
+      res.writeHead(200,{'content-type':'application/json','content-range':`${offset}-${offset+rows.length-1}/${total}`});return res.end(JSON.stringify(rows));
+    } catch(error){return reply({message:error.message,code:error.code},403);}
   }
   if(url.pathname==='/rest/v1/help_requests') {
     const actor=tokenSubject(req);

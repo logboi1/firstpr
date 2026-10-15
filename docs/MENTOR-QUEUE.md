@@ -20,7 +20,7 @@ Apply `20261015115437_mentor_help_queue.sql` after the existing migrations, firs
 
 `help_responses` is append-only for application sessions. Inserts derive the author and timestamp from database defaults; callers cannot forge either. Only a currently assigned, currently authorized mentor can insert while the request is claimed. The trigger locks the parent for direct API inserts too, preventing a response from slipping behind cancellation, release, or resolution. Author IDs stay in database audit data; the UI projection exposes guidance text, dates, and whether the current mentor wrote it.
 
-The migration has not been applied to a hosted project by this feature implementation. Run provider advisors and real Supabase session checks in the development project before a pilot. Local advisor execution requires a running Supabase database/Docker stack; embedded and native CI authorization tests do not replace those hosted checks.
+The migration was applied to the hosted FirstPR project on 2026-10-15 at the owner’s request. Catalog, privilege and missing-identity checks passed. Run provider advisors and real Supabase session checks in the development project before a pilot. Local advisor execution requires a running Supabase database/Docker stack; embedded and native CI authorization tests do not replace those hosted checks.
 
 ## Validation
 
