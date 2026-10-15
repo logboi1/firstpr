@@ -61,7 +61,7 @@ test('empty directory, provider error recovery and loading feedback', async ({ p
   await request.get('http://127.0.0.1:54329/directory-control?mode=error-once');
   await page.goto('/opportunities?q=setup');
   await expect(page.getByRole('heading', {name:'We could not load the opportunities.',exact:true})).toBeVisible();
-  await page.getByRole('link', {name:'Clear filters and retry',exact:true}).click();
+  await page.getByRole('button', {name:'Clear filters and retry',exact:true}).click();
   await expect(page).toHaveURL(/\/opportunities$/);
   await expect(page.getByRole('status')).toContainText('14 opportunities available');
   await request.get('http://127.0.0.1:54329/directory-control?mode=slow');

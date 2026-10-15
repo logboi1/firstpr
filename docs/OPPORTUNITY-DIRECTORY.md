@@ -16,7 +16,7 @@ Do not publish fictional fixture tasks to a real pilot. `supabase/seed.sql` rema
 - The database paginates at 12 records, with newest tasks first and ID as a stable tie-breaker. Page requests beyond the last page clamp to the last available page. Counts and cards come from one query snapshot.
 - Drafts and archives never appear in cards, counts, or skill choices, even for curators. The app uses a server-only anonymous Supabase client, independently of account cookies, with uncached reads. The SQL function uses invoker security and existing row-level policies.
 - Cards show skill tags, difficulty, type, summary, repository, and source issue links. External links require HTTPS, open in a new tab, and use `noopener noreferrer`. The application does not fetch those links.
-- In-app task details and persisted checklists remain issue #5. Cards link directly to the source issue rather than an unimplemented detail route.
+- Cards now link to in-app task details and persisted checklists from issue #5, and retain source links. See `CHECKLISTS.md`.
 - Loading feedback covers initial loads and changed filters through a keyed Suspense boundary. Error recovery refreshes server data while preserving the URL filters. Empty search results offer a way to clear filters.
 - Forms have explicit labels, visible keyboard focus, native selects, an Apply button, and a GET fallback when JavaScript is unavailable. Mobile layout stacks controls and cards.
 
