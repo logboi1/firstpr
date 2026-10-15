@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 test.beforeEach(async ({ request }) => {
-  await request.get("http://127.0.0.1:54329/reset");
+  await request.get("http://localhost:54329/reset");
 });
 test("GitHub sign-in, onboarding, refresh, own profile editing, logout and stale mutation denial", async ({
   page,
@@ -97,7 +97,7 @@ test("expired cookie session is refreshed and persisted on the response", async 
   await page.reload();
   await expect(page).toHaveURL(/\/onboarding$/);
   const stats = await (
-    await request.get("http://127.0.0.1:54329/stats")
+    await request.get("http://localhost:54329/stats")
   ).json();
   expect(stats.refreshes).toBeGreaterThan(0);
   const refreshed = (await context.cookies()).find(

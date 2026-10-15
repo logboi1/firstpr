@@ -1,6 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 async function login(page:Page,email:string,name:string) {
-  await page.context().addCookies([{name:'firstpr-test-account',value:email.split('@')[0],domain:'127.0.0.1',path:'/'}]);
+  await page.context().addCookies([{name:'firstpr-test-account',value:email.split('@')[0],domain:'localhost',path:'/'}]);
   await page.goto('/sign-in');
   await page.getByRole('button',{name:'Continue with GitHub',exact:true}).click();
   await expect(page).toHaveURL(/\/onboarding$/);await page.getByLabel('Display name',{exact:true}).fill(name);
@@ -8,8 +8,8 @@ async function login(page:Page,email:string,name:string) {
 }
 test('curator-only drafts, publication, stale edits, history-safe editing, archival and revoked-role denial',async({page,browser,request})=>{
   test.setTimeout(90000);
-  await request.get('http://127.0.0.1:54329/reset');
-  await request.get('http://127.0.0.1:54329/curator-control?enabled=true');
+  await request.get('http://localhost:54329/reset');
+  await request.get('http://localhost:54329/curator-control?enabled=true');
   await page.goto('/admin/opportunities/new');await expect(page).toHaveURL(/\/sign-in$/);
   await login(page,'ada@example.com','Ada');
   await expect(page.getByRole('link',{name:'Curator workspace',exact:true})).toHaveCount(0);
@@ -60,10 +60,10 @@ test('curator-only drafts, publication, stale edits, history-safe editing, archi
   await visitor.goto(`/opportunities/${task}`);await expect(visitor.getByRole('heading',{name:'Task unavailable',exact:true})).toBeVisible();
   await curator.goto('/admin/opportunities/new');await curator.getByLabel('Title',{exact:true}).fill('Preserved after access loss');await curator.getByLabel('Summary',{exact:true}).fill('Unsaved draft');
   await curator.setViewportSize({width:390,height:844});expect(await curator.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
-  await request.get('http://127.0.0.1:54329/curator-control?enabled=false');
+  await request.get('http://localhost:54329/curator-control?enabled=false');
   await curator.getByRole('button',{name:'Save draft',exact:true}).click();
   await expect(curator.getByRole('alert').filter({hasText:'Curator access is required'})).toBeVisible();
   await expect(curator.getByLabel('Title',{exact:true})).toHaveValue('Preserved after access loss');
-  await request.get('http://127.0.0.1:54329/curator-control?enabled=true');
+  await request.get('http://localhost:54329/curator-control?enabled=true');
   await curatorContext.close();await visitorContext.close();
 });

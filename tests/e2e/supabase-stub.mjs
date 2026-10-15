@@ -62,7 +62,7 @@ async function asActor(subject,query,args=[]) {
   });
 }
 http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://127.0.0.1:54329');
+  const url = new URL(req.url, 'http://localhost:54329');
   let text = ''; for await (const part of req) text += part;
   const body = text ? JSON.parse(text) : {};
   const reply = (data, status=200) => {res.writeHead(status, {'content-type':'application/json'});res.end(JSON.stringify(data));};
@@ -136,4 +136,4 @@ http.createServer(async (req, res) => {
     return reply(profiles[subject]);
   }
   reply({message:'Unexpected endpoint'},404);
-}).listen(54329, '127.0.0.1');
+}).listen(54329);

@@ -1,6 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 async function signIn(page:Page,email:string,name:string) {
-  await page.context().addCookies([{name:'firstpr-test-account',value:email.split('@')[0],domain:'127.0.0.1',path:'/'}]);
+  await page.context().addCookies([{name:'firstpr-test-account',value:email.split('@')[0],domain:'localhost',path:'/'}]);
   await page.goto('/sign-in');
   await page.getByRole('button',{name:'Continue with GitHub',exact:true}).click();
   await expect(page).toHaveURL(/\/onboarding$/);
@@ -10,9 +10,9 @@ async function signIn(page:Page,email:string,name:string) {
 }
 test('published instructions, persistent independent checklists, archived access and stale mutation denial',async({page,browser,request})=>{
   test.setTimeout(60000);
-  await request.get('http://127.0.0.1:54329/reset');
-  await request.get('http://127.0.0.1:54329/directory-control?mode=normal');
-  const {task}=await(await request.get('http://127.0.0.1:54329/task-control')).json();
+  await request.get('http://localhost:54329/reset');
+  await request.get('http://localhost:54329/directory-control?mode=normal');
+  const {task}=await(await request.get('http://localhost:54329/task-control')).json();
   await page.goto(`/opportunities/${task}`);
   await expect(page.getByRole('heading',{name:'[DEMO] Documentation task 1',exact:true})).toBeVisible();
   await expect(page.getByText('Read the fictional contribution guide',{exact:true})).toBeVisible();
@@ -44,7 +44,7 @@ test('published instructions, persistent independent checklists, archived access
   await expect(bobFirst).not.toBeChecked();
   await bobSecond.click(); await expect(bobSecond).toBeChecked();
   await page.reload(); await expect(first).toBeChecked(); await expect(second).not.toBeChecked();
-  await request.get('http://127.0.0.1:54329/task-control?archive=true');
+  await request.get('http://localhost:54329/task-control?archive=true');
   const visitor=await browser.newContext();const anonymous=await visitor.newPage();
   await anonymous.goto(`/opportunities/${task}`);
   await expect(anonymous.getByRole('heading',{name:'Task unavailable',exact:true})).toBeVisible();
