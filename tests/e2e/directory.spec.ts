@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-test.beforeEach(async ({ request }) => { await request.get('http://127.0.0.1:54329/directory-control?mode=normal'); });
+test.beforeEach(async ({ request }) => { await request.get('http://localhost:54329/directory-control?mode=normal'); });
 test('public cards, combined filters, pagination, URL persistence, keyboard controls and no-match recovery', async ({ page }) => {
   await page.goto('/opportunities');
   await expect(page.getByRole('status')).toContainText('14 opportunities available');
@@ -49,22 +49,22 @@ test('public cards, combined filters, pagination, URL persistence, keyboard cont
   await expect(page.getByLabel('Search tasks', {exact:true})).toHaveValue('');
 });
 test('empty directory, provider error recovery and loading feedback', async ({ page, request }) => {
-  await request.get('http://127.0.0.1:54329/directory-control?mode=empty');
+  await request.get('http://localhost:54329/directory-control?mode=empty');
   await page.goto('/opportunities');
   await expect(page.getByRole('heading', {name:'New opportunities are on the way.',exact:true})).toBeVisible();
-  await request.get('http://127.0.0.1:54329/directory-control?mode=error-once');
+  await request.get('http://localhost:54329/directory-control?mode=error-once');
   await page.goto('/opportunities?q=keyboard');
   await expect(page.getByRole('heading', {name:'We could not load the opportunities.',exact:true})).toBeVisible();
   await page.getByRole('button', {name:'Try again',exact:true}).click();
   await expect(page.getByRole('status')).toContainText('1 opportunity matching your filters');
   await expect(page.getByLabel('Search tasks', {exact:true})).toHaveValue('keyboard');
-  await request.get('http://127.0.0.1:54329/directory-control?mode=error-once');
+  await request.get('http://localhost:54329/directory-control?mode=error-once');
   await page.goto('/opportunities?q=setup');
   await expect(page.getByRole('heading', {name:'We could not load the opportunities.',exact:true})).toBeVisible();
   await page.getByRole('button', {name:'Clear filters and retry',exact:true}).click();
   await expect(page).toHaveURL(/\/opportunities$/);
   await expect(page.getByRole('status')).toContainText('14 opportunities available');
-  await request.get('http://127.0.0.1:54329/directory-control?mode=slow');
+  await request.get('http://localhost:54329/directory-control?mode=slow');
   await page.goto('/opportunities?q=documentation', {waitUntil:'commit'});
   await expect(page.getByRole('status').filter({hasText:'Loading opportunities'})).toBeVisible();
   await expect(page.getByRole('status')).toContainText('13 opportunities matching your filters');

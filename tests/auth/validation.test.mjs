@@ -1,12 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { emailSchema, codeSchema, profileInput } from '../../src/lib/auth/validation.ts';
-test('email and OTP reject malformed inputs', () => {
-  assert.equal(emailSchema.parse('  ada@example.com  '), 'ada@example.com');
-  for (const value of ['', 'ada', 'a'.repeat(255) + '@example.com']) assert.equal(emailSchema.safeParse(value).success, false);
-  for (const value of ['123456', '12345678']) assert.equal(codeSchema.safeParse(value).success, true);
-  for (const value of ['123', '12345x', '12345678901']) assert.equal(codeSchema.safeParse(value).success, false);
-});
+import { profileInput } from '../../src/lib/auth/validation.ts';
 test('profile validation normalizes skills and ignores owner and role input', () => {
   const form = new FormData();
   form.set('display_name', '  Ada  ');

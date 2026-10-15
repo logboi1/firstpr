@@ -62,7 +62,7 @@ async function asActor(subject,query,args=[]) {
   });
 }
 http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://127.0.0.1:54329');
+  const url = new URL(req.url, 'http://localhost:54329');
   let text = ''; for await (const part of req) text += part;
   const body = text ? JSON.parse(text) : {};
   const reply = (data, status=200) => {res.writeHead(status, {'content-type':'application/json'});res.end(JSON.stringify(data));};
@@ -103,12 +103,24 @@ http.createServer(async (req, res) => {
   if (url.pathname === '/health') return reply({ok:true});
   if (url.pathname === '/reset') {profiles=Object.fromEntries(Object.keys(users).map(id=>[id,{...defaultProfile,id}])); revoked.clear(); refreshes=0;return reply({ok:true});}
   if (url.pathname === '/stats') return reply({refreshes});
-  if (url.pathname === '/auth/v1/otp') return reply({});
-  if (url.pathname === '/auth/v1/verify') {
-    if (body.token !== '12345678') return reply({msg:'Invalid code', error_code:'otp_expired'},403);
-    return reply(session(body.email==='curator@example.com' ? curatorId : body.email==='bob@example.com' ? otherId : id));
+  if (url.pathname === '/auth/v1/authorize') {
+    const redirectTo=url.searchParams.get('redirect_to');
+    if(!redirectTo) return reply({message:'Missing redirect URL'},400);
+    const account=req.headers.cookie?.match(/(?:^|; )firstpr-test-account=([^;]+)/)?.[1];
+    const subject=account==='curator' ? curatorId : account==='bob' ? otherId : id;
+    const destination=new URL(redirectTo);
+    destination.searchParams.set('code',subject);
+    res.writeHead(302,{location:destination.toString()});return res.end();
   }
-  if (url.pathname === '/auth/v1/token') { refreshes++; return reply(session(refreshSubjects.get(body.refresh_token)||id)); }
+  if (url.pathname === '/auth/v1/token') {
+    if(url.searchParams.get('grant_type')==='pkce') {
+      if(!users[body.auth_code]||!body.code_verifier) return reply({message:'Invalid OAuth code'},400);
+      return reply(session(body.auth_code));
+    }
+    const subject=refreshSubjects.get(body.refresh_token);
+    if(!subject) return reply({message:'Invalid refresh token'},400);
+    refreshes++; return reply(session(subject));
+  }
   const token = req.headers.authorization?.replace('Bearer ', '');
   const subject=tokenSubject(req);
   if (!subject) return reply({message:'Unauthenticated', msg:'Unauthenticated'},401);
@@ -124,4 +136,4 @@ http.createServer(async (req, res) => {
     return reply(profiles[subject]);
   }
   reply({message:'Unexpected endpoint'},404);
-}).listen(54329, '127.0.0.1');
+}).listen(54329);

@@ -1,24 +1,18 @@
 # Authentication and onboarding
 
-Issue #3 adds email-code sign-in/sign-up, local-session sign-out, cookie session refresh, onboarding, and own-profile editing. The dashboard is an account summary; task progress remains issue #10. GitHub OAuth is not included.
+Issue #3 adds GitHub OAuth sign-in/sign-up, local-session sign-out, cookie session refresh, onboarding, and own-profile editing. The dashboard is an account summary; task progress remains issue #10.
 
-## Configure a development Supabase project
+## Configure GitHub sign-in
 
-1. Apply both migrations following `DATABASE.md`. The new migration adds `profiles.onboarding_completed` with a false default. Existing accounts complete onboarding once. The flag is a preference, not an authorization role.
-2. Copy `.env.example` to `.env.local`. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from your development project. Use a publishable key, never a service-role key.
-3. Enable the Email provider and allow new sign-ups. Configure the project's Site URL for the development app. In **Authentication → Email Templates → Magic Link**, include the code:
+1. Apply the migrations following `DATABASE.md`. They add the profile and onboarding schema used after sign-in.
+2. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from your Supabase project.
+3. In GitHub, open **Settings → Developer settings → OAuth Apps → New OAuth App**. Set the application name to `FirstPR`, the homepage URL to `http://localhost:3000`, and the authorization callback URL to `https://eoziebyvhrgpyreyilcg.supabase.co/auth/v1/callback`.
+4. Create the app and copy its **Client ID**. Select **Generate a new client secret** and copy the secret immediately; GitHub will not show it again.
+5. In Supabase, open **Authentication → Sign In / Providers → GitHub**, enable GitHub, and enter the Client ID and client secret. Save the provider. Keep the secret in Supabase; do not put it in `.env.local`, client code, or Git.
+6. In Supabase **Authentication → URL Configuration**, set the Site URL to your app and add `http://localhost:3000/auth/callback` to the allowed redirect URLs. Add the exact production callback route too, for example `https://your-app.example.com/auth/callback`.
+7. Restart `npm run dev`. Open `/sign-in` and choose **Continue with GitHub**. The app exchanges the callback code for a session; profile creation is performed by the existing database signup trigger. Complete onboarding and test refresh, sign-out, and returning-user sign-in. Use a second account to verify it cannot read or update the first profile. Elevated roles still require administrator assignment.
 
-   ```html
-   <h2>Sign in to FirstPR</h2>
-   <p>Your sign-in code is: <strong>{{ .Token }}</strong></p>
-   <p>Enter this code in the FirstPR tab where you requested it.</p>
-   ```
-
-   FirstPR verifies the code directly; it has no email-link callback route. Configure the OTP length between 6 and 10 digits and review expiration/rate limits. Supabase's default email delivery has restrictions; use authorized test addresses or configure SMTP before inviting a pilot.
-4. Restart `npm run dev`. Open `/sign-in`, request a code, and copy it from the email into the same page. For a local Supabase stack, use its email inbox. Profile creation is performed by the existing database signup trigger after authentication creates the user.
-5. Complete onboarding and check refresh, sign-out, and returning-user sign-in. Use a second account to verify it cannot read or update the first profile. Elevated roles still require administrator assignment.
-
-Without environment configuration, the homepage remains usable and `/sign-in` explains the setup requirement. Protected pages redirect to sign-in. No hosted project was configured or changed by this implementation.
+Without environment configuration, the homepage remains usable and `/sign-in` explains the setup requirement. Protected pages redirect to sign-in. OAuth provider credentials must be configured in both GitHub and Supabase before sign-in can work.
 
 ## Security and session behavior
 
@@ -31,7 +25,7 @@ Profile updates derive the owner ID from the validated user, allow only display 
 ## Verification
 
 - `npm run check`: lint, TypeScript, form-input tests, database allowed/denied tests across all migrations, production build.
-- `npm run test:e2e`: Playwright against a disposable localhost Supabase contract stub. Install Chromium with `npx playwright install --with-deps chromium` first. Tests cover invalid code, onboarding, returning-user routing, reload persistence, refreshed response cookies, forged owner fields, sign-out, and rejected stale-tab profile mutations. The stub sends no email and does not replace live-provider validation.
+- `npm run test:e2e`: Playwright against a disposable localhost Supabase contract stub. Install Chromium with `npx playwright install --with-deps chromium` first. Tests cover the OAuth callback, onboarding, returning-user routing, reload persistence, refreshed response cookies, forged owner fields, sign-out, and rejected stale-tab profile mutations. The stub does not replace live-provider validation.
 - CI runs the browser contract tests separately and retains native PostgreSQL authorization tests.
 
-Before pilot release, test real email delivery, token expiry, provider outages, and account isolation in a dedicated Supabase project. Contract tests verify the app integration, not Supabase's implementation or production deployment.
+Before pilot release, test real GitHub OAuth, token expiry, provider outages, and account isolation in a dedicated Supabase project. Contract tests verify the app integration, not Supabase's implementation or production deployment.
