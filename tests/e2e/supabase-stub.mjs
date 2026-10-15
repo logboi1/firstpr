@@ -97,7 +97,7 @@ http.createServer(async (req, res) => {
   if(url.pathname==='/rest/v1/help_requests') {
     const actor=tokenSubject(req);
     if(!actor) return reply({message:'Unauthenticated'},401);
-    if(helpMode==='error-once'||(helpMode==='mutation-error-once'&&req.method!=='GET')) {helpMode='normal';return reply({message:'Fictional help provider failure'},503);}
+    if(helpMode==='error-once'||(helpMode==='mutation-error-once'&&req.method!=='GET')) {const status=helpMode==='error-once' ? 400 : 503;helpMode='normal';return reply({message:'Fictional help provider failure'},status);}
     try {
       if(req.method==='POST') {
         await asActor(actor,'insert into public.help_requests(opportunity_id,blocker) values($1,$2)',[body.opportunity_id,body.blocker]);
