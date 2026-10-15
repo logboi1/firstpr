@@ -1,0 +1,16 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { getDetail } from "@/lib/opportunities/detail";
+import { taskId } from "@/lib/opportunities/checklist-input";
+import { label } from "@/lib/opportunities/filters";
+import { StartTask, TaskChecklist } from "@/components/task-checklist";
+export const dynamic="force-dynamic";
+export const metadata={title:"Task instructions — FirstPR"};
+export default async function TaskDetail({params}:{params:Promise<{id:string}>}) {
+  const {id}=await params;
+  if(!taskId.safeParse(id).success) notFound();
+  const {configured,detail,signedIn}=await getDetail(id);
+  if(!configured) return <section className="directory-state"><h2>Task instructions are not available yet.</h2><p>The task connection has not been configured. Please check back soon.</p><Link className="button secondary" href="/opportunities">Back to opportunities</Link></section>;
+  if(!detail) notFound();
+  return <article className="task-detail"><Link className="back-link" href="/opportunities">← Back to opportunities</Link><div className="task-title"><div className="opportunity-meta"><span className={`difficulty difficulty-${detail.difficulty}`}>{label(detail.difficulty)}</span><span>{label(detail.contribution_type)}</span></div><h1>{detail.title}</h1><p>{detail.summary}</p><ul className="skill-tags" aria-label="Required skills">{detail.skills.map((skill,index)=><li key={`${index}-${skill}`}>{skill}</li>)}</ul></div>{detail.status==="archived" && <p className="archive-note" role="status">This task is archived. You started it before archival and can continue using these instructions. Check the source issue before doing more work.</p>}<div className="task-columns"><div><section className="instruction-section"><h3>Before you start</h3><p className="instruction-text">{detail.prerequisites||"No additional prerequisites have been listed. Read the project’s contribution guidelines first."}</p></section><section className="instruction-section"><h3>Set up the project</h3><p className="instruction-text">{detail.setup_notes}</p></section><section className="instruction-section"><h3>Project links</h3><div className="actions"><a className="button secondary" href={detail.repository_url} target="_blank" rel="noopener noreferrer">Open repository ↗</a><a className="button secondary" href={detail.issue_url} target="_blank" rel="noopener noreferrer">Open source issue ↗</a></div><p className="field-hint">Links open in a new tab. Check the contribution guidelines and current issue availability before starting.</p></section></div><section className="checklist-panel" aria-labelledby="checklist-title"><h3 id="checklist-title">Your contribution checklist</h3>{!detail.steps.length && <p>No checklist steps have been added to this task yet.</p>}{!signedIn ? <><p>Sign in to start this task and save your own progress.</p><Link className="button primary" href="/sign-in">Sign in to save progress</Link><ol className="checklist-preview">{detail.steps.map(step=><li key={step.id}>{step.label}</li>)}</ol></> : !detail.started ? <><p>Start this task when you’re ready. Your progress stays separate from everyone else’s.</p><StartTask id={detail.id}/><ol className="checklist-preview">{detail.steps.map(step=><li key={step.id}>{step.label}</li>)}</ol></> : <TaskChecklist detail={detail}/>}</section></div></article>;
+}
