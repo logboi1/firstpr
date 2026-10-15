@@ -12,7 +12,7 @@ export default function Home() {
   return (
     <>
       <header className="shell header">
-        <Link className="wordmark" href="/" aria-label="FirstPR home"><span className="brand-icon" aria-hidden="true">↗</span>First<span>PR</span><span className="alpha">building in public</span></Link>
+        <Link className="wordmark" href="/"><span className="brand-icon" aria-hidden="true">↗</span>First<span>PR</span><span className="alpha">building in public</span></Link>
         <nav aria-label="Main navigation"><Link href="/opportunities">Find a task</Link><Link href="/sign-in">Sign in</Link><a className="repo-link" href={repository}>GitHub <span aria-hidden="true">↗</span></a></nav>
       </header>
       <main id="main" tabIndex={-1}>

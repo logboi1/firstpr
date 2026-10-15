@@ -25,6 +25,8 @@ async function onboard(page: Page, name: string) {
 test('public pages, keyboard skip link and recoverable failure remain accessible on mobile', async ({ page, request }, info) => {
   test.setTimeout(180000);
   await request.get(stub + '/reset');
+  await page.goto('/');
+  await scan(page, info, 'home-desktop');
   await page.setViewportSize({ width: 390, height: 844 });
   for (const [name, path] of [['home', '/'], ['sign-in', '/sign-in'], ['directory', '/opportunities'], ['board', '/progress'], ['404', '/missing-page']]) {
     await page.goto(path);
