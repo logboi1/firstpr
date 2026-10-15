@@ -5,7 +5,7 @@ create table public.help_responses (
   id uuid primary key default gen_random_uuid(),
   help_request_id uuid not null references public.help_requests(id) on delete cascade,
   mentor_id uuid not null default auth.uid() references public.profiles(id) on delete restrict,
-  body text not null check (char_length(btrim(body)) between 1 and 4000),
+  body text not null check (char_length(body) between 1 and 4000 and body ~ '[^[:space:]]'),
   created_at timestamptz not null default now()
 );
 create index help_responses_request_idx on public.help_responses(help_request_id,created_at,id);
@@ -56,7 +56,7 @@ begin
     update public.help_requests set status='open',assigned_mentor_id=null
       where id=wanted and status='claimed' and assigned_mentor_id=auth.uid() returning id into changed;
   elsif action in ('respond','resolve') then
-    if response is null or char_length(btrim(response)) not between 1 and 4000 then
+    if response is null or char_length(btrim(response)) not between 1 and 4000 or response !~ '[^[:space:]]' then
       raise exception 'Write guidance using 1 to 4000 characters' using errcode='22023';
     end if;
     select * into request from public.help_requests where id=wanted for update;

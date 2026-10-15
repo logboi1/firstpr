@@ -298,6 +298,9 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       assert.equal(queue.items.find(item=>item.id===id).participant_id,undefined);
       await rows("select public.mentor_help_action($1,'claim')",[id]);
       await denied("select public.mentor_help_action($1,'resolve',' ')",[id],'22023');
+      await denied("select public.mentor_help_action($1,'respond',$2)",[id,'\t\n'],'22023');
+      await denied("insert into public.help_responses(help_request_id,body) values($1,$2)",[id,'\t\n'],'23514');
+      await denied("insert into public.help_responses(help_request_id,body) values($1,$2)",[id,' '.repeat(4000)+'x'],'23514');
       await denied("insert into public.help_responses(help_request_id,body,mentor_id) values($1,'fake',$2)",[id,ids.otherMentor]);
       await rows("select public.mentor_help_action($1,'respond','  Try the documented Node version.  ')",[id]);
       const note=(await rows('select * from public.help_responses where help_request_id=$1',[id]))[0];
