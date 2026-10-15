@@ -1,5 +1,5 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { startGitHubSignIn, saveProfile, signOut } from "@/app/auth/actions";
 import type { FormState, Profile } from "@/lib/auth/validation";
 const initial: FormState = {};
@@ -24,21 +24,27 @@ export function GitHubSignInButton() {
 }
 export function ProfileForm({ profile }: { profile: Profile }) {
   const [state, action, pending] = useActionState(saveProfile, initial);
+  const [name, setName] = useState(profile.onboarding_completed ? profile.display_name : "");
+  const [skills, setSkills] = useState(profile.skills.join(", "));
+  const [experience, setExperience] = useState(profile.experience);
+  const [consent, setConsent] = useState(profile.public_board_consent);
   return (
-    <form action={action} className="account-form">
+    <form action={action} className="account-form" aria-busy={pending}>
       <label htmlFor="display-name">Display name</label>
       <input
         id="display-name"
         name="display_name"
         maxLength={80}
         required
-        defaultValue={profile.onboarding_completed ? profile.display_name : ""}
+        value={name}
+        onChange={event => setName(event.target.value)}
       />
       <label htmlFor="skills">Skills and interests</label>
       <input
         id="skills"
         name="skills"
-        defaultValue={profile.skills.join(", ")}
+        value={skills}
+        onChange={event => setSkills(event.target.value)}
         aria-describedby="skills-hint"
       />
       <p id="skills-hint" className="field-hint">
@@ -49,7 +55,8 @@ export function ProfileForm({ profile }: { profile: Profile }) {
       <select
         id="experience"
         name="experience"
-        defaultValue={profile.experience}
+        value={experience}
+        onChange={event => setExperience(event.target.value as Profile["experience"])}
       >
         <option value="beginner">Beginner</option>
         <option value="intermediate">Intermediate</option>
@@ -59,7 +66,8 @@ export function ProfileForm({ profile }: { profile: Profile }) {
         <input
           type="checkbox"
           name="public_board_consent"
-          defaultChecked={profile.public_board_consent}
+          checked={consent}
+          onChange={event => setConsent(event.target.checked)}
         />{" "}
         Show my display name, PR links, recorded statuses and submission dates on the public progress board.
       </label>

@@ -15,7 +15,7 @@ export default function Home() {
         <Link className="wordmark" href="/" aria-label="FirstPR home"><span className="brand-icon" aria-hidden="true">↗</span>First<span>PR</span><span className="alpha">building in public</span></Link>
         <nav aria-label="Main navigation"><Link href="/opportunities">Find a task</Link><Link href="/sign-in">Sign in</Link><a className="repo-link" href={repository}>GitHub <span aria-hidden="true">↗</span></a></nav>
       </header>
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <section className="shell hero" aria-labelledby="hero-title">
           <div className="hero-copy">
             <p className="eyebrow"><span className="status-dot" aria-hidden="true"/> OPEN SOURCE. OPEN TO YOU.</p>

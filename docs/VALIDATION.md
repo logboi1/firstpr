@@ -1,19 +1,45 @@
-# Foundation validation
+# End-to-end validation
 
-Completed on 14 October 2026 using Node.js 24.19.0. CI is configured for Node.js 22; its remote results should be reviewed on the foundation pull request.
+Run `npm ci`, `npx playwright install --with-deps chromium`, then
+`FIRSTPR_E2E_PRODUCTION=1 npm run test:e2e`. This builds the release application
+with disposable fixture configuration before starting it. `npm run test:e2e`
+alone uses the development server. Neither command uses hosted Supabase data.
+Do not run a development server or a second build concurrently in this checkout.
 
-- `npm run lint`: passed with zero warnings.
-- `npm run typecheck`: passed.
-- `npm run build`: passed; Next.js generated the home page and the custom not-found route.
-- Production HTTP smoke check: `/` returned 200 with the expected development notice, concept preview, and GitHub issue link. An unknown route returned 404 with the custom recovery content.
-- Backlog script dry run: listed the target repository, milestone, six labels, twelve tasks, and tracking issue without accessing GitHub.
-- Backlog script with a temporary mocked GitHub CLI: two sequential runs created one milestone, six labels, twelve tasks, and one tracker; the second run created no duplicate resources. All issues had the expected milestone and a body.
-- `git diff --check`: passed.
+The browser fixture simulates GitHub OAuth and Supabase HTTP responses; database
+operations execute the real migrations, RPCs and RLS in disposable PGlite.
+It cannot establish that GitHub or hosted Supabase configuration works.
+`npm run check` runs input, database and build checks; CI additionally runs the
+same database suite on a fresh PostgreSQL 17 service, including simultaneous
+claim and archive locking tests that PGlite cannot exercise.
 
-## Verification limits
+## Acceptance coverage
 
-No visual browser QA or real authenticated application workflow has been performed. Mobile behavior is implemented in CSS but has not been visually verified. Supabase authentication, data persistence, permissions, and the remaining MVP workflows are not implemented yet.
+| Requirement | Automated evidence |
+| --- | --- |
+| Complete participant → mentor → curator → board flow | `journey-accessibility.spec.ts`: one participant starts a task, updates a checkbox using Space, gets private guidance and resolution, submits a PR, receives manual verification, opts in and sees the signed-out board update |
+| Session and profile recovery | `auth.spec.ts`, plus journey validation retaining edited skills and experience |
+| Owner and elevated-role boundaries | Auth, help, mentor, curator, contributions and progress browser specs; database policies and forged-owner tests |
+| Claim races and stale decisions | Mentor browser stale claim, native PostgreSQL concurrent claim; curator/contribution stale edit and review cases |
+| Meaningful failure recovery | Directory, help, mentor, contribution and progress provider failures, draft preservation, retry and expired sessions |
+| Labels and contrast | Full-page axe WCAG 2.1 A/AA scans across public pages, onboarding, profile validation, checklist, help, mentor queue/response, curator editor/review, submission and progress |
+| Keyboard and mobile | Skip link focus, Space checklist activation and retained focus, textarea focus outline, 390px scans/overflow assertions; existing feature specs also exercise mobile |
 
-Initial GitHub issue and branch creation attempts returned 403 `Resource not accessible by integration`. Repository access was subsequently granted and branch creation succeeded. The milestone setup helper remains available for maintainers; publication and CI status are recorded in GitHub rather than treated as local validation evidence.
+CI uploads `browser-validation` for 14 days, including the HTML report, full axe
+JSON attachments, mobile screenshots and failure traces/screenshots. Use
+`npx playwright show-report` locally to inspect the report. Axe rules are not
+suppressed. These checks are regression evidence, not a WCAG conformance claim.
 
-The initial dependency install reported an ESLint 9 support-status warning. The installed ESLint version passed the configured checks; review toolchain updates during maintenance. Dependencies are reproducible through `package-lock.json`.
+## Real-provider and manual pilot checks
+
+Before calling the hosted MVP pilot validated, use dedicated participant, mentor
+and curator test accounts against the deployed app, and repeat the connected
+journey with real GitHub sign-in. Confirm redirect URLs, refresh/reload, logout
+across tabs, and expected role assignments. Verify the linked PR manually against
+GitHub; the application records a curator decision, not automatic GitHub state.
+
+Manually test keyboard navigation through the full flow, screen-reader labels,
+validation and status announcements (for example NVDA/Firefox or VoiceOver/Safari),
+200% text zoom, 400% browser zoom/reflow, mobile touch targets and focus visibility.
+Include disabled, pending, empty and error states. Automated Chromium/axe checks
+do not replace these assistive-technology and real-provider checks.
