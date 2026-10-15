@@ -412,6 +412,38 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       await actor();
       assert.equal((await rows("select * from public.get_public_progress()")).length, 0);
     });
+    await suite.test("dashboard owns every aggregate, including elevated users; public totals honor consent and filter pagination",async()=>{
+      await actor();await denied('select public.get_participant_dashboard(1)');
+      const empty=(await rows("select public.get_public_progress_board(1,'') as data"))[0].data;
+      assert.deepEqual(empty.counts,{submitted:0,merged:0,closed:0});
+      await actor('alice');const mine=(await rows('select public.get_participant_dashboard(1) as data'))[0].data;
+      assert.ok(mine.total>=1);assert.ok(mine.steps_completed<=mine.steps_total);assert.equal(mine.contributions.merged,1);
+      const actual=(await rows('select count(*)::int as total from public.help_requests where participant_id=auth.uid() and status in (\'open\',\'claimed\')'))[0].total;
+      assert.equal(mine.help.open+mine.help.claimed,actual);
+      await actor('mentor');const mentor=(await rows('select public.get_participant_dashboard(1) as data'))[0].data;
+      assert.deepEqual(mentor.help,{open:0,claimed:0,resolved:0,cancelled:0});assert.deepEqual(mentor.contributions,{submitted:0,merged:0,closed:0});
+      await actor('curator');const curator=(await rows('select public.get_participant_dashboard(1) as data'))[0].data;
+      assert.equal(curator.contributions.submitted,1);assert.equal(curator.contributions.merged,0);
+      await actor('alice');
+      const fixture=(await rows("insert into public.contributions(opportunity_id,pr_url) select $1,'https://github.com/firstpr-demo/board/pull/'||n from generate_series(1,22)n returning id",[opportunity])).map(row=>row.id);
+      await rows('update public.profiles set public_board_consent=true where id=auth.uid()');
+      await actor('curator');await rows("update public.contributions set status='closed' where id=$1",[fixture[0]]);
+      await actor();const board=(await rows("select public.get_public_progress_board(1,'') as data"))[0].data;
+      assert.deepEqual(Object.keys(board).sort(),['items','total','page','pages','counts'].sort());
+      assert.equal(board.total,23);assert.equal(board.items.length,20);assert.deepEqual(board.counts,{submitted:21,merged:1,closed:1});
+      for(const item of board.items)assert.deepEqual(Object.keys(item).sort(),['display_name','pr_url','status','submitted_at'].sort());
+      const second=(await rows("select public.get_public_progress_board(999999,'') as data"))[0].data;assert.equal(second.page,2);assert.equal(second.items.length,3);
+      assert.equal(new Set([...board.items,...second.items].map(row=>row.pr_url)).size,23);
+      const merged=(await rows("select public.get_public_progress_board(1,'merged') as data"))[0].data;assert.equal(merged.total,1);assert.equal(merged.items[0].status,'merged');assert.deepEqual(merged.counts,board.counts);
+      await denied("select public.get_public_progress_board(1,'invalid')",[],'22023');
+      await actor('alice');await rows('update public.profiles set public_board_consent=false where id=auth.uid()');
+      await actor();assert.equal((await rows("select public.get_public_progress_board(1,'') as data"))[0].data.total,0);
+      await admin();await db.query('delete from public.contributions where id=any($1::uuid[])',[fixture]);
+      const functions=await rows("select proname,prosecdef,proconfig from pg_proc where proname in ('get_participant_dashboard','get_public_progress_board')");
+      assert.equal(functions.length,2);assert.ok(functions.every(fn=>fn.proconfig.some(value=>value.startsWith('search_path='))));
+      assert.equal(functions.find(fn=>fn.proname==='get_participant_dashboard').prosecdef,false);assert.equal(functions.find(fn=>fn.proname==='get_public_progress_board').prosecdef,true);
+      assert.equal((await rows("select has_table_privilege('anon','public.contributions','SELECT') allowed"))[0].allowed,false);
+    });
     await suite.test("archiving preserves instructions for existing participants and blocks new participants", async () => {
       await actor("curator");
       await db.query("update public.opportunities set status='archived' where id=$1", [opportunity]);
@@ -427,6 +459,9 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       assert.equal((await rows("select id from public.opportunities where id=$1", [opportunity])).length, 1);
       assert.equal((await rows("select id from public.checklist_steps where id=$1", [step])).length, 1);
       await db.query("insert into public.help_requests(opportunity_id,blocker) values ($1,'Existing participant continues')", [opportunity]);
+      const dashboard=(await rows('select public.get_participant_dashboard(1) as data'))[0].data;
+      assert.ok(dashboard.items.some(task=>task.id===opportunity&&task.status==='archived'));
+      assert.equal(JSON.stringify(dashboard).includes('Existing participant continues'),false);
     });
     await suite.test("published checklist steps cannot be deleted, even by curators", async () => {
       await actor("curator");
@@ -563,6 +598,16 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       await rows('select public.archive_curator_opportunity($1,$2)',[incomplete,incompleteVersion]);
       assert.equal((await rows('select status from public.opportunities where id=$1',[incomplete]))[0].status,'archived');
       await admin();
+    });
+    await suite.test("dashboard task pagination is bounded and preserves distinct starts",async()=>{
+      await actor('alice');const before=(await rows('select public.get_participant_dashboard(1) as data'))[0].data.total;
+      await admin();const tasks=(await rows("insert into public.opportunities(title,summary,skills,contribution_type,difficulty,repository_url,issue_url,setup_notes,status) select '[DEMO] dashboard page '||n,'Fictional pagination',ARRAY['Markdown'],'documentation','beginner','https://example.invalid/page','https://example.invalid/page/1','Fictional setup','published' from generate_series(1,13)n returning id")).map(row=>row.id);
+      await actor('alice');for(const id of tasks)await rows('select public.start_opportunity($1)',[id]);
+      const first=(await rows('select public.get_participant_dashboard(1) as data'))[0].data;
+      const last=(await rows('select public.get_participant_dashboard(999999) as data'))[0].data;
+      assert.equal(first.total,before+13);assert.equal(first.items.length,12);assert.equal(last.page,last.pages);assert.ok(last.items.length<=12);
+      assert.equal(new Set([...first.items,...last.items].map(task=>task.id)).size,first.items.length+last.items.length);
+      await admin();await db.query('delete from public.opportunity_participations where opportunity_id=any($1::uuid[])',[tasks]);await db.query('delete from public.opportunities where id=any($1::uuid[])',[tasks]);
     });
     await suite.test("private helpers have fixed search paths and trigger functions are not client-callable", async () => {
       await admin();
