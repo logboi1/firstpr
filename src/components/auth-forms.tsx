@@ -28,8 +28,9 @@ export function ProfileForm({ profile }: { profile: Profile }) {
   const [skills, setSkills] = useState(profile.skills.join(", "));
   const [experience, setExperience] = useState(profile.experience);
   const [consent, setConsent] = useState(profile.public_board_consent);
+  // React resets action forms even on logical validation errors; preserve every draft field.
   return (
-    <form action={action} className="account-form" aria-busy={pending}>
+    <form action={action} className="account-form" aria-busy={pending} onReset={event => event.preventDefault()}>
       <label htmlFor="display-name">Display name</label>
       <input
         id="display-name"

@@ -54,11 +54,14 @@ test('one participant journey reaches mentor resolution, curator verification an
   await page.getByLabel('Display name', { exact: true }).fill('   ');
   await page.getByLabel('Skills and interests', { exact: true }).fill('Documentation, testing');
   await page.getByLabel('Experience level', { exact: true }).selectOption('intermediate');
+  await page.getByRole('checkbox', { name: /Show my display name/ }).check();
   await page.getByRole('button', { name: 'Save and continue', exact: true }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'Enter a display name.' })).toBeVisible();
   await expect(page.getByLabel('Skills and interests', { exact: true })).toHaveValue('Documentation, testing');
   await expect(page.getByLabel('Experience level', { exact: true })).toHaveValue('intermediate');
+  await expect(page.getByRole('checkbox', { name: /Show my display name/ })).toBeChecked();
   await scan(page, info, 'profile-validation');
+  await page.getByRole('checkbox', { name: /Show my display name/ }).uncheck();
   await onboard(page, 'JOURNEY participant');
   await page.goto('/profile'); await scan(page, info, 'profile');
   for (const path of ['/mentor/help', '/admin/contributions', '/admin/opportunities']) {
