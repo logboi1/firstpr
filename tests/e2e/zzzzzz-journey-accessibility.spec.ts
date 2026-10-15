@@ -5,6 +5,8 @@ const stub = 'http://localhost:54329';
 async function scan(page: Page, info: TestInfo, name: string) {
   // Streaming route fallbacks must finish before scanning the actual screen.
   await expect(page.getByRole('status').filter({ hasText: /^Loading/ })).toHaveCount(0);
+  await expect(page).toHaveTitle(/FirstPR/);
+  await page.evaluate(() => document.fonts.ready);
   // Full-page WCAG A/AA scans; never exclude controls or disable failing rules.
   const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   if (['home-desktop', 'directory', 'onboarding', 'profile', 'help-form', 'mentor-response', 'curator-editor', 'curator-review', 'participant-mobile-dashboard'].includes(name)) {
@@ -84,6 +86,8 @@ test('one participant journey reaches mentor resolution, curator verification an
   await expect(checkbox).toBeChecked(); await expect(checkbox).toBeFocused();
   await scan(page, info, 'task-checklist');
   await page.getByRole('link', { name: 'Request help', exact: true }).click();
+  await expect(page.getByLabel('What is blocking you?', { exact: true })).toBeVisible();
+  await expect(page).toHaveTitle('Request help — FirstPR');
   await scan(page, info, 'help-form');
   const blocker = 'JOURNEY private blocker: where should I add the regression test?';
   const textarea = page.getByLabel('What is blocking you?', { exact: true });
