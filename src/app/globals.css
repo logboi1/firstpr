@@ -55,7 +55,7 @@ button:disabled, fieldset:disabled { opacity: .65; }
 .primary { color: var(--surface); background: var(--green); box-shadow: 3px 3px 0 var(--ink); }
 .primary:hover:not(:disabled) { background: #193f32; transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
 .primary:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
-.secondary { color: var(--ink); background: var(--surface); border-color: #999e90; }
+.secondary { color: var(--ink); background: var(--surface); border-color: #7d8875; }
 .secondary:hover:not(:disabled) { background: #ebece1; border-color: var(--ink); }
 .text-link, .back-link, .clear-filters { text-decoration: underline; text-underline-offset: 4px; font-size: 14px; font-weight: 500; }
 .text-link:hover, .back-link:hover, .clear-filters:hover { color: var(--green); }
@@ -127,9 +127,9 @@ button:disabled, fieldset:disabled { opacity: .65; }
 label, .curator-form legend { font-size: 14px; line-height: 1.6; font-weight: 600; }
 /* Native controls keep dependable keyboard and assistive-technology behaviour. */
 input:not([type=checkbox]):not([type=radio]):not([type=hidden]), select, textarea {
-  width: 100%; min-width: 0; min-height: 48px; border: 1.5px solid #969e8f; border-radius: 6px; background-color: #fffefa; color: var(--ink); padding: 12px 14px; font-size: 14px; line-height: 1.5; box-shadow: 0 1px 2px #242a2606; transition: border-color .15s, background-color .15s;
+  width: 100%; min-width: 0; min-height: 48px; border: 1.5px solid #7d8875; border-radius: 6px; background-color: #fffefa; color: var(--ink); padding: 12px 14px; font-size: 14px; line-height: 1.5; box-shadow: 0 1px 2px #242a2606; transition: border-color .15s, background-color .15s;
 }
-input::placeholder, textarea::placeholder { color: #74786c; opacity: 1; }
+input::placeholder, textarea::placeholder { color: #6a7062; opacity: 1; }
 input:not([type=checkbox]):hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) { border-color: #596651; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { border-color: var(--green); background-color: #fff; }
 select { appearance: none; padding-right: 42px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%234c5a48' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; cursor: pointer; }
