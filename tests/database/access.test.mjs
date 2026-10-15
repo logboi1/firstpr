@@ -264,6 +264,24 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       assert.equal((await rows("select status from public.help_requests where id=$1", [id]))[0].status, "cancelled");
     });
 
+    await suite.test("participant cancellation covers claimed requests; terminal requests cannot be claimed or reopened", async () => {
+      await actor("alice");
+      const id=(await rows("insert into public.help_requests(opportunity_id,blocker) values($1,'Claimed cancellation fixture') returning id",[opportunity]))[0].id;
+      await actor("mentor");
+      await db.query("update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 and status='open'",[id]);
+      // A participant screen must still use this filter when the actor is a mentor.
+      assert.equal((await rows("select id from public.help_requests where participant_id=auth.uid() and id=$1",[id])).length,0);
+      await actor("bob");
+      assert.equal((await rows("update public.help_requests set status='cancelled' where id=$1 returning id",[id])).length,0);
+      await actor("alice");
+      assert.equal((await rows("update public.help_requests set status='cancelled' where id=$1 and participant_id=auth.uid() and status in ('open','claimed') returning id",[id])).length,1);
+      assert.equal((await rows("update public.help_requests set status='open' where id=$1 returning id",[id])).length,0);
+      await actor("mentor");
+      assert.equal((await rows("update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 and status='open' returning id",[id])).length,0);
+      assert.equal((await rows("update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 returning id",[id])).length,0);
+      assert.equal((await rows("update public.help_requests set status='claimed',assigned_mentor_id=auth.uid() where id=$1 and status='open' returning id",[helpId])).length,0);
+    });
+
     let contributionId;
     await suite.test("participants submit valid PRs; duplicates and invalid URLs are rejected", async () => {
       await actor("alice");
