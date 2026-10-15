@@ -23,7 +23,8 @@ await directoryDb.exec(`
     'https://example.invalid/ui','https://example.invalid/ui/issues/1','Fictional setup','published'),
     ('[DEMO] Secret draft','Not public',ARRAY['DraftOnly'],'code','beginner','https://example.invalid/draft','https://example.invalid/draft/1','','draft'),
     ('[DEMO] Archived task','Not public',ARRAY['ArchivedOnly'],'code','beginner','https://example.invalid/archive','https://example.invalid/archive/1','Fictional setup','archived');
-  insert into auth.users(id) values ('30000000-0000-4000-8000-000000000001'),('30000000-0000-4000-8000-000000000002');
+  insert into auth.users(id) values ('30000000-0000-4000-8000-000000000001'),('30000000-0000-4000-8000-000000000002'),('30000000-0000-4000-8000-000000000003');
+  insert into public.user_roles(user_id,role) values ('30000000-0000-4000-8000-000000000003','curator');
   update public.opportunities set prerequisites='Read the fictional contribution guide',setup_notes=E'Install dependencies\nRun the tests' where title='[DEMO] Documentation task 1';
   insert into public.checklist_steps(id,opportunity_id,label,position)
     select '20000000-0000-4000-8000-000000000011'::uuid,id,'Read the contribution guide',0 from public.opportunities where title='[DEMO] Documentation task 1';
@@ -34,7 +35,8 @@ await directoryDb.exec(`
 let directoryMode = 'normal';
 const id = '30000000-0000-4000-8000-000000000001';
 const otherId = '30000000-0000-4000-8000-000000000002';
-const users = Object.fromEntries([[id,'ada@example.com'],[otherId,'bob@example.com']].map(([id,email])=>[id,{id,aud:'authenticated',role:'authenticated',email,app_metadata:{},user_metadata:{},created_at:'2026-10-14T00:00:00Z'}]));
+const curatorId='30000000-0000-4000-8000-000000000003';
+const users = Object.fromEntries([[id,'ada@example.com'],[otherId,'bob@example.com'],[curatorId,'curator@example.com']].map(([id,email])=>[id,{id,aud:'authenticated',role:'authenticated',email,app_metadata:{},user_metadata:{},created_at:'2026-10-14T00:00:00Z'}]));
 const defaultProfile = { display_name:'New contributor',skills:[],experience:'beginner',public_board_consent:false,onboarding_completed:false };
 let profiles = Object.fromEntries(Object.keys(users).map(id=>[id,{...defaultProfile,id}]));
 let refreshes=0;
@@ -64,6 +66,12 @@ http.createServer(async (req, res) => {
   let text = ''; for await (const part of req) text += part;
   const body = text ? JSON.parse(text) : {};
   const reply = (data, status=200) => {res.writeHead(status, {'content-type':'application/json'});res.end(JSON.stringify(data));};
+  if(url.pathname==='/curator-control') {
+    await directoryDb.transaction(async tx=>{await tx.exec('reset role');
+      if(url.searchParams.get('enabled')==='false') await tx.query("delete from public.user_roles where user_id=$1 and role='curator'",[curatorId]);
+      else await tx.query("insert into public.user_roles(user_id,role) values($1,'curator') on conflict do nothing",[curatorId]);
+    });return reply({ok:true});
+  }
   if(url.pathname==='/task-control') {
     const fixture=await directoryDb.transaction(async tx=>{
       await tx.exec('reset role');
@@ -77,7 +85,7 @@ http.createServer(async (req, res) => {
   if(url.pathname.startsWith('/rest/v1/rpc/') && url.pathname!=='/rest/v1/rpc/browse_opportunities') {
     const actor=tokenSubject(req);
     const rpc=url.pathname.split('/').pop();
-    const operations={get_opportunity_detail:['select public.get_opportunity_detail($1) as data',[body.wanted]],start_opportunity:['select public.start_opportunity($1) as data',[body.wanted]],set_checklist_step:['select public.set_checklist_step($1,$2,$3) as data',[body.wanted,body.step,body.completed]]};
+    const operations={get_opportunity_detail:['select public.get_opportunity_detail($1) as data',[body.wanted]],start_opportunity:['select public.start_opportunity($1) as data',[body.wanted]],set_checklist_step:['select public.set_checklist_step($1,$2,$3) as data',[body.wanted,body.step,body.completed]],save_curator_opportunity:['select public.save_curator_opportunity($1,$2,$3::jsonb,$4) as data',[body.wanted,body.expected_updated_at,JSON.stringify(body.payload),body.publish]],archive_curator_opportunity:['select public.archive_curator_opportunity($1,$2) as data',[body.wanted,body.expected_updated_at]],get_curator_opportunity:['select public.get_curator_opportunity($1) as data',[body.wanted]],list_curator_opportunities:['select public.list_curator_opportunities($1,$2) as data',[body.page_number,body.status_filter]]};
     if(!operations[rpc]) return reply({message:'Unknown RPC'},404);
     try {const {rows}=await asActor(actor,...operations[rpc]);return reply(rows[0].data||null);}
     catch(error) {return reply({message:error.message,code:error.code},403);}
@@ -98,7 +106,7 @@ http.createServer(async (req, res) => {
   if (url.pathname === '/auth/v1/otp') return reply({});
   if (url.pathname === '/auth/v1/verify') {
     if (body.token !== '12345678') return reply({msg:'Invalid code', error_code:'otp_expired'},403);
-    return reply(session(body.email==='bob@example.com' ? otherId : id));
+    return reply(session(body.email==='curator@example.com' ? curatorId : body.email==='bob@example.com' ? otherId : id));
   }
   if (url.pathname === '/auth/v1/token') { refreshes++; return reply(session(refreshSubjects.get(body.refresh_token)||id)); }
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -106,6 +114,10 @@ http.createServer(async (req, res) => {
   if (!subject) return reply({message:'Unauthenticated', msg:'Unauthenticated'},401);
   if (url.pathname === '/auth/v1/user') return reply(users[subject]);
   if (url.pathname === '/auth/v1/logout') {revoked.add(token);return reply({});}
+  if (url.pathname === '/rest/v1/user_roles') {
+    if(url.searchParams.get('user_id')!==`eq.${subject}`) return reply({message:'Wrong owner'},403);
+    const {rows}=await asActor(subject,"select role from public.user_roles where user_id=$1 and role='curator'",[subject]);return reply(rows);
+  }
   if (url.pathname === '/rest/v1/profiles') {
     if (url.searchParams.get('id') !== `eq.${subject}`) return reply({message:'Wrong owner'},403);
     if (req.method === 'PATCH') profiles[subject]={...profiles[subject],...body};

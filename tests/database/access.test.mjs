@@ -412,6 +412,56 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       await denied("select public.set_checklist_step($1,$2,true)",[task,late]);
       await admin();
     });
+    await suite.test("curator lifecycle RPCs reject noncurators, validate publication, preserve history, and detect stale saves",async()=>{
+      const payload={title:'Curator fixture',summary:'A reviewed task',skills:[],contribution_type:'documentation',difficulty:'beginner',repository_url:'',issue_url:'',prerequisites:'',setup_notes:'',steps:[],created_by:ids.bob,status:'published'};
+      await actor();await denied('select public.save_curator_opportunity(null,null,$1::jsonb,false)',[JSON.stringify(payload)]);
+      for(const name of ['alice','mentor']) {
+        await actor(name);await denied('select public.save_curator_opportunity(null,null,$1::jsonb,false)',[JSON.stringify(payload)]);
+        await denied("select public.list_curator_opportunities()");
+        await denied('select public.get_curator_opportunity($1)',[opportunity]);
+        await denied('select public.archive_curator_opportunity($1,now())',[opportunity]);
+      }
+      await actor('curator');
+      const task=(await rows('select public.save_curator_opportunity(null,null,$1::jsonb,false) as id',[JSON.stringify(payload)]))[0].id;
+      const snapshot=async()=> (await rows('select public.get_curator_opportunity($1) as data',[task]))[0].data;
+      assert.equal((await snapshot()).status,'draft');
+      assert.equal((await rows('select created_by from public.opportunities where id=$1',[task]))[0].created_by,ids.curator);
+      const version=(await snapshot()).updated_at;
+      await denied('select public.save_curator_opportunity($1,$2,$3::jsonb,true)',[task,version,JSON.stringify({...payload,title:'Should roll back'})],'23514');
+      assert.equal((await snapshot()).title,payload.title);
+      await denied('select public.save_curator_opportunity($1,$2,$3::jsonb,false)',[task,version,JSON.stringify({...payload,repository_url:'javascript:alert(1)'})],'23514');
+      await denied('select public.save_curator_opportunity($1,$2,$3::jsonb,false)',[task,version,JSON.stringify({...payload,title:'Invalid steps',steps:['a'.repeat(501)]})],'23514');
+      assert.deepEqual((await snapshot()).steps,[]);
+      const ready={...payload,skills:['Markdown'],repository_url:'https://example.invalid/curated',issue_url:'https://example.invalid/curated/issues/1',setup_notes:'Install and test',steps:['Read guidelines','Run tests']};
+      await rows('select public.save_curator_opportunity($1,$2,$3::jsonb,true)',[task,version,JSON.stringify(ready)]);
+      assert.equal((await snapshot()).status,'published');
+      assert.deepEqual((await snapshot()).steps,ready.steps);
+      const stepRows=await rows('select id,label from public.checklist_steps where opportunity_id=$1 order by position',[task]);
+      const publishedVersion=(await snapshot()).updated_at;
+      await denied('select public.save_curator_opportunity($1,$2,$3::jsonb,false)',[task,'2000-01-01T00:00:00Z',JSON.stringify({...ready,steps:null,title:'Stale edit'})],'40001');
+      await denied('select public.save_curator_opportunity($1,$2,$3::jsonb,false)',[task,publishedVersion,JSON.stringify({...ready,steps:['Replacement']})]);
+      await denied("update public.opportunities set status='draft' where id=$1",[task]);
+      await denied("delete from public.checklist_steps where opportunity_id=$1",[task]);
+      await denied("update public.checklist_steps set label='Changed' where id=$1",[stepRows[0].id]);
+      await denied("insert into public.checklist_steps(opportunity_id,label,position) values($1,'Added',2)",[task]);
+      await rows('select public.save_curator_opportunity($1,$2,$3::jsonb,false)',[task,publishedVersion,JSON.stringify({...ready,title:'Updated task information',steps:null})]);
+      assert.deepEqual(await rows('select id,label from public.checklist_steps where opportunity_id=$1 order by position',[task]),stepRows);
+      await actor('alice');await rows('select public.start_opportunity($1)',[task]);
+      await actor('curator');
+      await denied('select public.archive_curator_opportunity($1,$2)',[task,'2000-01-01T00:00:00Z'],'40001');
+      await rows('select public.archive_curator_opportunity($1,$2)',[task,(await snapshot()).updated_at]);
+      assert.equal((await snapshot()).status,'archived');
+      await denied('select public.save_curator_opportunity($1,$2,$3::jsonb,false)',[task,(await snapshot()).updated_at,JSON.stringify({...ready,steps:null})]);
+      await actor();assert.equal((await rows('select public.get_opportunity_detail($1) as data',[task]))[0].data,null);
+      const directory=(await rows("select public.browse_opportunities('Updated task information') as data"))[0].data;assert.equal(directory.total,0);
+      await actor('alice');assert.equal((await rows('select public.get_opportunity_detail($1) as data',[task]))[0].data.status,'archived');
+      await actor('curator');
+      const incomplete=(await rows('select public.save_curator_opportunity(null,null,$1::jsonb,false) as id',[JSON.stringify(payload)]))[0].id;
+      const incompleteVersion=(await rows('select public.get_curator_opportunity($1) as data',[incomplete]))[0].data.updated_at;
+      await rows('select public.archive_curator_opportunity($1,$2)',[incomplete,incompleteVersion]);
+      assert.equal((await rows('select status from public.opportunities where id=$1',[incomplete]))[0].status,'archived');
+      await admin();
+    });
     await suite.test("private helpers have fixed search paths and trigger functions are not client-callable", async () => {
       await admin();
       const functions = await rows("select proname, proconfig from pg_proc where pronamespace='private'::regnamespace");

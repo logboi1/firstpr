@@ -105,6 +105,16 @@ Archived opportunities leave the visitor directory and cannot be edited. Partici
 
 `get_opportunity_detail(wanted)` is an invoker-security read with explicit published/existing-archived filtering, even for curators. It returns ordered steps and only the caller's completion flags; there are no participant IDs, timestamps, or other people's progress in the response. The narrow `private.step_is_completed` helper reads only the current actor's completion, avoiding anonymous SELECT grants on private progress. All new functions have fixed empty search paths, explicit execute grants, and no authorization from profile metadata.
 
+## Curator management
+
+`20261015003000_curator_management.sql` adds invoker-security CRUD/read RPCs: `list_curator_opportunities`, `get_curator_opportunity`, `save_curator_opportunity`, and `archive_curator_opportunity`. Each checks a real actor and `private.has_role('curator')`, runs under participant credentials and existing RLS, has a fixed empty search path, and exposes execute only to authenticated callers. Curators still cannot assign roles.
+
+A draft needs a title and summary; missing links, skills, setup text, or checklist can be filled later. URL constraints permit blank links only for unpublished records and otherwise require canonical standard HTTPS links without credentials, whitespace, backslashes, or custom ports. Publishing requires setup text, 1–30 nonblank skills of up to 60 characters, valid links, and 1–50 checklist steps. Field/table constraints also apply. Lifecycle triggers enforce these rules for authenticated direct writes, disallow returning published tasks to draft, and preserve archived records.
+
+Draft checklist replacement and metadata saves happen in one transaction. Parent row locks serialize saves, publication, step edits, and archival; expected `updated_at` timestamps reject stale edits with `40001` without partially applying them. Published checklist rows cannot be added, edited, or deleted by clients; labels and IDs retain their meaning for existing completion records. Published metadata remains editable. Archives are terminal and read-only.
+
+Trusted SQL administrators with no application actor claim can repair or import data; RLS, RPC actor checks, and client grants still prevent anonymous or unprivileged callers using that repair path. This exception also permits labelled disposable fixtures representing existing publication history. It is not an application route or a service-role pattern. Real curator roles must be assigned using the controlled bootstrap above.
+
 ## Public opportunity directory
 
 `20261014223000_opportunity_directory.sql` adds `browse_opportunities(search_query, skill_filter, type_filter, difficulty_filter, page_number)`. It uses invoker security and a fixed empty search path, retains RLS, and explicitly selects only published opportunities for every caller. Execute permission is limited to `anon` and `authenticated` (plus the function owner); it has no write operations.
