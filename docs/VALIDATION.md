@@ -17,7 +17,7 @@ claim and archive locking tests that PGlite cannot exercise.
 
 | Requirement | Automated evidence |
 | --- | --- |
-| Complete participant → mentor → curator → board flow | `journey-accessibility.spec.ts`: one participant starts a task, updates a checkbox using Space, gets private guidance and resolution, submits a PR, receives manual verification, opts in and sees the signed-out board update |
+| Complete participant → mentor → curator → board flow | `zzzzzz-journey-accessibility.spec.ts`: one participant starts a task, updates a checkbox using Space, gets private guidance and resolution, submits a PR, receives manual verification, opts in and sees the signed-out board update |
 | Session and profile recovery | `auth.spec.ts`, plus journey validation retaining edited skills and experience |
 | Owner and elevated-role boundaries | Auth, help, mentor, curator, contributions and progress browser specs; database policies and forged-owner tests |
 | Claim races and stale decisions | Mentor browser stale claim, native PostgreSQL concurrent claim; curator/contribution stale edit and review cases |
