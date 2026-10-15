@@ -6,7 +6,7 @@ async function scan(page: Page, info: TestInfo, name: string) {
   // Full-page WCAG A/AA scans; never exclude controls or disable failing rules.
   const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   await info.attach(`${name}-axe.json`, { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
-  expect(result.violations, `${name}: ${JSON.stringify(result.violations)}`).toEqual([]);
+  expect.soft(result.violations.map(({ id, nodes }) => ({ id, elements: nodes.map(node => node.html) })), name).toEqual([]);
   await expect(page.getByRole('main')).toHaveCount(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 }
@@ -124,7 +124,8 @@ test('one participant journey reaches mentor resolution, curator verification an
     await page.getByRole('button', { name: 'Join public progress', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Make my progress private', exact: true })).toBeVisible();
     // The public read uses an independent, signed-out context.
-    const visitor = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const visitorContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const visitor = await visitorContext.newPage();
     try {
       await visitor.goto('/progress');
       const entry = visitor.locator('.public-contribution').filter({ has: visitor.locator(`a[href="${url}"]`) });
@@ -132,7 +133,7 @@ test('one participant journey reaches mentor resolution, curator verification an
       expect(await visitor.content()).not.toContain(blocker);
       await scan(visitor, info, 'public-mobile-result');
       await info.attach('completed-mobile-journey', { body: await visitor.screenshot({ fullPage: true }), contentType: 'image/png' });
-    } finally { await visitor.close(); }
+    } finally { await visitorContext.close(); }
     // Leave shared fixtures private for the remaining independent regression specs.
     await page.getByRole('button', { name: 'Make my progress private', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Join public progress', exact: true })).toBeVisible();
