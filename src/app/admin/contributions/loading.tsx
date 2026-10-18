@@ -1,1 +1,4 @@
-export default function Loading(){return <p role="status">Loading the PR review queue…</p>;}
+import { AppLoading } from "@/components/app-loading";
+export default function Loading() {
+  return <AppLoading label="Loading the PR review queue…"/>;
+}

@@ -44,3 +44,21 @@ The browser report now also attaches representative desktop and mobile screens
 for reviewing the directory, onboarding/profile, help form, mentor response,
 curator editor/review and participant dashboard. See `VALIDATION.md` for test
 boundaries and the remaining real-provider and assistive-technology pilot checks.
+
+## Shared Git workflow loader
+
+Use `AppLoading` from `src/components/app-loading.tsx` for screen/content loading.
+Its optional `label` names the actual work (for example `Loading your profile…`).
+The component centres itself in the available content area and scales to phones.
+The root route fallback provides a full-viewport main landmark; child fallbacks
+use their existing account/directory layout. Dashboard loading uses AccountShell.
+
+Four original SVG icons show code → push → pull request → merge. A decorative
+commit marker passes along the connectors on a 4.8-second CSS loop. This is an
+indeterminate illustration, not measured progress or a real Git operation. Only
+the stable status message is announced; the artwork is hidden from assistive
+technology. Reduced motion shows the static chain without a moving marker.
+
+`DirectoryLoading` delegates to the same component, including the directory's
+inline Suspense fallback. Form submission labels such as “Saving…” stay local
+to their controls so a pending mutation does not replace the page or steal focus.
