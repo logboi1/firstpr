@@ -34,6 +34,7 @@ await directoryDb.exec(`
   set role anon;
 `);
 let directoryMode = 'normal';
+let directoryWaiters = [];
 let helpMode='normal';
 let contributionMode='normal';
 let progressMode='normal';
@@ -175,10 +176,15 @@ http.createServer(async (req, res) => {
     try {const {rows}=await asActor(actor,...operations[rpc]);return reply(rows[0].data||null);}
     catch(error) {return reply({message:error.message,code:error.code},403);}
   }
-  if (url.pathname === '/directory-control') { directoryMode = url.searchParams.get('mode') || 'normal'; return reply({ok:true}); }
+  if (url.pathname === '/directory-control') {
+    directoryMode = url.searchParams.get('mode') || 'normal';
+    if (directoryMode !== 'hold') { const pending = directoryWaiters; directoryWaiters = []; for (const release of pending) release(); }
+    return reply({ok:true});
+  }
   if (url.pathname === '/rest/v1/rpc/browse_opportunities') {
     if (directoryMode === 'error-once') {directoryMode='normal';return reply({message:'Fictional provider failure'},400);}
     if (directoryMode === 'empty') return reply({items:[],total:0,page:1,pages:1,skills:[]});
+    if (directoryMode === 'hold') await new Promise(resolve => directoryWaiters.push(resolve));
     if (directoryMode === 'slow') await new Promise(resolve => setTimeout(resolve,1800));
     const {rows} = await asActor(null,'select public.browse_opportunities($1,$2,$3,$4,$5) as data',[
       body.search_query,body.skill_filter,body.type_filter,body.difficulty_filter,body.page_number

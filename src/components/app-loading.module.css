@@ -1,0 +1,97 @@
+.root {
+  display: grid;
+  place-items: center;
+  min-height: clamp(300px, 58svh, 580px);
+  padding: 36px 8px;
+}
+.panel { width: min(100%, 492px); }
+.artwork {
+  border: 1.5px solid var(--ink);
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: 5px 5px 0 var(--ink);
+}
+.topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1.5px solid var(--ink);
+  border-radius: 5px 5px 0 0;
+  padding: 11px 16px;
+  background: var(--mint);
+  color: var(--green);
+  font: 10px/1.6 var(--mono);
+}
+.lights { display: flex; gap: 5px; }
+.lights i { width: 6px; height: 6px; border: 1px solid var(--green); border-radius: 1px; }
+.lights i:first-child { background: var(--green); }
+.topline > span:nth-child(2) { margin-right: auto; }
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 34px 18px 28px; }
+.stage { position: relative; display: grid; justify-items: center; align-content: start; min-width: 0; gap: 14px; }
+.icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--green);
+  box-shadow: 2px 2px 0 #c7cdbd;
+  animation: handoff-node 4.8s linear infinite;
+  animation-delay: var(--handoff-delay);
+}
+.stageLabel { max-width: 100%; font: 10px/1.5 var(--mono); color: var(--ink); text-align: center; }
+.connector { position: absolute; top: 27px; left: calc(50% + 30px); width: calc(100% - 60px); height: 2px; background: #aab59e; }
+.connector::after { content: ''; position: absolute; right: 0; top: -2px; width: 6px; height: 6px; border-top: 1px solid #6c7c60; border-right: 1px solid #6c7c60; transform: rotate(45deg); }
+.commit {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  background: var(--yellow);
+  opacity: 0;
+  animation: handoff-commit 4.8s linear infinite;
+  animation-delay: var(--handoff-delay);
+}
+.caption { display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px dashed var(--line); font: 9px/1.6 var(--mono); color: #58644f; }
+.message { text-align: center; padding: 28px 12px 0; }
+/* Specificity keeps the shared status rule from shrinking the primary message. */
+.message .label[role=status] { margin: 0 0 8px; font-size: 16px; font-weight: 600; line-height: 1.7; text-wrap: balance; }
+.hint { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+@keyframes handoff-node {
+  0%, 17% { background: var(--yellow); color: var(--ink); border-color: var(--ink); box-shadow: 3px 3px 0 var(--ink); transform: translateY(-2px); }
+  25%, 100% { background: var(--paper); color: var(--green); border-color: var(--ink); box-shadow: 2px 2px 0 #c7cdbd; transform: translateY(0); }
+}
+@keyframes handoff-commit {
+  0%, 17% { opacity: 0; left: 0; }
+  18% { opacity: 1; left: 0; }
+  24.5% { opacity: 1; left: calc(100% - 8px); }
+  25%, 100% { opacity: 0; left: calc(100% - 8px); }
+}
+@media (max-width: 600px) {
+  .root { min-height: 340px; padding-inline: 0; }
+  .flow { padding: 28px 8px 24px; }
+  .icon { width: 42px; height: 42px; }
+  .icon svg { width: 22px; height: 22px; }
+  .connector { top: 20px; left: calc(50% + 23px); width: calc(100% - 46px); }
+  .stageLabel { font-size: 9px; }
+  .caption { padding-inline: 12px; font-size: 8px; }
+  .caption > span:last-child { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .icon, .commit { animation: none; }
+  .icon { background: var(--mint); box-shadow: 2px 2px 0 var(--ink); }
+  .commit { display: none; }
+}
+@media (forced-colors: active) {
+  .artwork, .topline, .icon { border-color: CanvasText; box-shadow: none; }
+  .connector, .commit { background: CanvasText; }
+  .commit { border-color: CanvasText; }
+}

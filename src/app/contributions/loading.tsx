@@ -1,1 +1,4 @@
-export default function Loading(){return <p role="status">Loading your pull requests…</p>;}
+import { AppLoading } from "@/components/app-loading";
+export default function Loading() {
+  return <AppLoading label="Loading your pull requests…"/>;
+}
