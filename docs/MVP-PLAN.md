@@ -22,7 +22,7 @@ This is an independent community project; do not imply official Hacktoberfest af
 - Progress board distinguishing submitted and merged contributions.
 - Curator tools to create, edit, publish, and archive opportunities.
 
-Defer automatic issue discovery, AI matching, chat, payments, certificates, persisted GitHub status syncing/webhooks, and multi-event administration. Public PR evidence is fetched automatically on contribution cards; this does not change curator decisions or aggregate counts. A submission remains submitted until its merge status is verified manually by a curator.
+Defer automatic issue discovery, AI matching, chat, payments, certificates, unattended GitHub status syncing/webhooks, and multi-event administration. Public PR evidence is fetched automatically on contribution cards. A trusted, participant-triggered worker also marks matching merged PRs done and updates stored counts. Other submissions remain pending for curator review.
 
 ## Implementation defaults
 

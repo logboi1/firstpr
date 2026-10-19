@@ -4,8 +4,18 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfig } from "@/lib/supabase/config";
 import { curatorContext } from "@/lib/curator/data";
+import { syncUserMerges } from "@/lib/contributions/sync";
 import { contributionInput,reviewInput,type ContributionState } from "@/lib/contributions/validation";
 function refresh() {revalidatePath("/contributions");revalidatePath("/admin/contributions");revalidatePath("/dashboard");revalidatePath("/progress");}
+export async function syncMyContributions() {
+  if (!supabaseConfig()) return {completed:0,unavailable:true};
+  const supabase = await createClient();
+  const {data,error} = await supabase.auth.getUser();
+  if(error || !data.user) return {completed:0,unavailable:true};
+  const result = await syncUserMerges(supabase);
+  if(result.completed > 0) refresh();
+  return result;
+}
 export async function saveContribution(_previous:ContributionState,form:FormData):Promise<ContributionState> {
   const parsed=contributionInput.safeParse({opportunity_id:form.get("opportunity_id"),pr_url:form.get("pr_url"),contribution_id:form.get("contribution_id")||undefined,expected_updated_at:form.get("expected_updated_at")||undefined});
   if(!parsed.success){const issue=parsed.error.issues[0];return issue.path[0]==="pr_url"?{fieldError:issue.message}:{error:issue.message};}
@@ -26,6 +36,8 @@ export async function saveContribution(_previous:ContributionState,form:FormData
       if(error?.code==="23505")return {fieldError:"You already submitted this pull request."};
       if(error)return {error:"Your PR could not be saved. Your link is still here; try again."};
     }
+    // A failed external check never discards a successfully saved link.
+    await syncUserMerges(supabase).catch(() => undefined);
   } catch {return {error:"We could not reach the submission service. Your link is still here; try again."};}
   refresh();revalidatePath(`/opportunities/${opportunity_id}`);
   if(!contribution_id)redirect("/contributions?sent=1");

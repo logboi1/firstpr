@@ -66,3 +66,31 @@ test('automatic public GitHub evidence stays distinct from curator status and re
   await expect(visitor.locator('[data-github-evidence]')).toHaveCount(0);
   await visitorContext.close();
 });
+
+test('matching merged PR is automatically done with GitHub audit and dashboard/public counts',async({page,browser,request})=>{
+  await request.get(stub+'/reset');await request.get(stub+'/auto-merge-control');
+  await page.context().addCookies([{name:'firstpr-test-account',value:'evidence',domain:'localhost',path:'/'}]);
+  await page.goto('/sign-in');await page.getByRole('button',{name:'Continue with GitHub',exact:true}).click();
+  await page.getByLabel('Display name',{exact:true}).fill('Auto merge fixture');
+  await page.getByRole('button',{name:'Save and continue',exact:true}).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  const {task}=await(await request.get(stub+'/task-control?fixture=2')).json();
+  await page.goto(`/contributions/new?opportunity=${task}`);
+  await page.getByLabel('GitHub pull-request URL',{exact:true}).fill('https://github.com/firstpr-fixture/client/pull/904');
+  await page.getByRole('button',{name:'Submit pull request',exact:true}).click();
+  await expect(page).toHaveURL(/\/contributions\?sent=1$/);
+  await expect(page.locator('.help-status')).toHaveText('merged');
+  await expect(page.getByText('Done — this contribution has been merged.',{exact:true})).toBeVisible();
+  await expect(page.locator('.verification-audit')).toContainText('Automatically verified by GitHub');
+  await expect(page.getByRole('button',{name:'Save PR link',exact:true})).toHaveCount(0);
+  await page.goto('/dashboard');await expect(page.locator('.progress-stats [data-status="merged"] dd')).toHaveText('1');
+  await page.getByRole('button',{name:'Join public progress',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Make my progress private',exact:true})).toBeVisible();
+  const visitorContext=await browser.newContext();const visitor=await visitorContext.newPage();
+  await visitor.goto('/progress');await expect(visitor.locator('.public-contribution .help-status')).toHaveText('merged');
+  await expect(visitor.locator('.progress-stats [data-status="merged"] dd')).toHaveText('1');
+  await page.getByRole('button',{name:'Make my progress private',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Join public progress',exact:true})).toBeVisible();
+  await visitor.reload();await expect(visitor.locator('.public-contribution')).toHaveCount(0);
+  await visitorContext.close();
+});

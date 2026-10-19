@@ -12,6 +12,7 @@ export const reviewInput = z.object({
 export const contributionSchema = z.object({
   id:uuid, opportunity_id:uuid, participant_id:uuid, pr_url:prUrl,
   status:z.enum(["submitted","merged","closed"]), verifier_id:uuid.nullable(),verified_at:z.string().nullable(),
+  verification_source:z.enum(["curator","github"]).nullable(),github_merged_at:z.string().nullable(),
   created_at:z.string(),updated_at:z.string(),opportunities:z.object({title:z.string()}).nullable(),
 });
 export type Contribution = z.infer<typeof contributionSchema>;

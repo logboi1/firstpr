@@ -156,3 +156,8 @@ Before a hosted pilot, repeat the access checks through a real Supabase developm
 ## Participant and public progress
 
 `20261015132144_participant_progress.sql` adds invoker-security own-only dashboard aggregates and a narrowly projected definer RPC for public board pagination/counts. Both have fixed search paths and explicit execute grants. The board joins current profile consent for every call and returns no private identity, profile, help or checklist fields. No anonymous table grants are added. See [PROGRESS.md](PROGRESS.md) for count semantics, visibility controls, freshness and tests.
+
+
+## Automatic GitHub merge completion
+
+`20261019001654_automatic_github_merge_completion.sql` adds private contribution audit columns and an RLS-enabled `private.github_merge_checks` throttle ledger. The three public merge RPCs are service-role-only invoker wrappers; private definer helpers check trusted OAuth provider identity, target repository, exact PR URL and row version under locks. Participant grants are unchanged, and curator corrections retain their actor-derived audit. Automatic completions use `verification_source=github`, a null human verifier and real GitHub merge/PR/author IDs. Existing counts include these merged records without widening the public projection. The ledger does not touch contribution versions. See [CONTRIBUTIONS.md](CONTRIBUTIONS.md) for invocation timing, failure behavior and Edge deployment.
