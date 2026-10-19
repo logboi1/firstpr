@@ -62,3 +62,14 @@ Checks run after a successful PR save, on the participant dashboard/contribution
 The Edge handler and authorization checks are tested against the same disposable database fixture used by browser tests. Hosted OAuth success is a separate pilot check; do not impersonate a participant to test it.
 
 References for the function’s session check and key handling: [Supabase signing keys](https://supabase.com/docs/guides/auth/signing-keys) and [API-key migration](https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys).
+
+
+## Close completed contributions in FirstPR (#43)
+
+After a submission is **merged/Done**, its participant or a curator can choose **Close contribution**. This is a FirstPR workflow step: it moves the entry out of the default active submissions list while retaining GitHub `merged` status, its verification audit, and all dashboard/public completed counts. It does not close a GitHub PR, revoke public sharing, delete the submission, tick checklists, or archive the shared opportunity.
+
+Use **Contribution view → Closed in FirstPR** to find closed completed work, **All contributions** to see both, and **Reopen contribution** to return an entry to the active list. Successful close/reopen actions open the corresponding view and show a confirmation. These filters work in both `/contributions` and `/admin/contributions`, combine with the existing GitHub submission-status filter, and persist through pagination. The old GitHub status option now explicitly says **Closed without merging** to distinguish it from FirstPR closure.
+
+`20261019004423_close_completed_contributions.sql` adds private `closed_at`/`closed_by` audit fields and a merged-only closure constraint. A service-independent authenticated invoker RPC calls a private fixed-search-path helper that checks the real owner/curator, locks the authorized record, and compares the exact row version. Repeat, stale, non-merged and inaccessible requests return false. The trigger derives the closure time/actor and rejects combined closure/verification edits. No client column grants or UPDATE policies are widened: participants still cannot edit a verified URL, status or audit. Visitors, other participants and unrelated mentors cannot close/reopen someone else's record. Curators may manage closure of their own already-verified submissions, but this does not grant self-verification.
+
+A curator returning a closed completed contribution to a non-merged status clears its workflow closure so the corrected submission is actionable again. Automatic merge sync ignores already merged entries and therefore does not reopen them. Current consent still governs public sharing, and workflow closure metadata is not added to the public RPC projection.

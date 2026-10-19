@@ -9,10 +9,15 @@ export const reviewInput = z.object({
   contribution_id:uuid, expected_updated_at:z.string().datetime({offset:true}),
   status:z.enum(["submitted","merged","closed"]), checked:z.literal("on",{error:"Confirm that you checked the pull request on GitHub."}),
 });
+export const closureInput = z.object({
+  contribution_id: uuid, expected_updated_at: z.string().datetime({offset:true}),
+  closed: z.enum(["true","false"]), scope: z.enum(["participant","curator"]),
+});
 export const contributionSchema = z.object({
   id:uuid, opportunity_id:uuid, participant_id:uuid, pr_url:prUrl,
   status:z.enum(["submitted","merged","closed"]), verifier_id:uuid.nullable(),verified_at:z.string().nullable(),
   verification_source:z.enum(["curator","github"]).nullable(),github_merged_at:z.string().nullable(),
+  closed_at:z.string().nullable(),
   created_at:z.string(),updated_at:z.string(),opportunities:z.object({title:z.string()}).nullable(),
 });
 export type Contribution = z.infer<typeof contributionSchema>;
@@ -20,4 +25,8 @@ export type ContributionState = {error?:string;fieldError?:string;message?:strin
 export function contributionFilters(params:Record<string,string|string[]|undefined>) {
   return {page:typeof params.page==="string"&&/^\d{1,6}$/.test(params.page)?Math.max(1,Number(params.page)):1,
     status:typeof params.status==="string"&&["submitted","merged","closed"].includes(params.status)?params.status:""};
+}
+export function contributionView(params:Record<string,string|string[]|undefined>) {
+  return typeof params.view === "string" && ["active","closed","all"].includes(params.view)
+    ? params.view as "active"|"closed"|"all" : "active";
 }

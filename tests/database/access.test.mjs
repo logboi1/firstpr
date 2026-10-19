@@ -645,6 +645,37 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       const corrected=(await rows('select * from public.contributions where id=$1',[item.id]))[0];
       assert.equal(corrected.verification_source,null);assert.equal(corrected.github_pr_id,null);assert.equal(corrected.github_merged_at,null);
     });
+    await suite.test("owners and curators close/reopen merged contributions without changing verification or public credit", async () => {
+      await admin();const task='10000000-0000-4000-8000-000000000098';
+      await db.query("insert into public.opportunities(id,title,summary,skills,contribution_type,difficulty,repository_url,issue_url,setup_notes,status) values($1,'Closure fixture','Closure fixture',ARRAY['React'],'code','beginner','https://github.com/example/project','https://github.com/example/project/issues/2','Run tests','published')",[task]);
+      await actor('alice');
+      const pending=(await rows("insert into public.contributions(opportunity_id,pr_url) values($1,'https://github.com/example/project/pull/98') returning id,to_jsonb(contributions)->>'updated_at' as version",[task]))[0];
+      const close='select public.set_contribution_closed($1,$2,$3) as changed';
+      assert.equal((await rows(close,[pending.id,pending.version,true]))[0].changed,false);
+      await denied('update public.contributions set closed_at=now() where id=$1',[pending.id]);
+      await denied('update public.contributions set closed_by=$1 where id=$2',[ids.bob,pending.id]);
+      await actor('curator');await db.query("update public.contributions set status='merged' where id=$1",[pending.id]);
+      const merged=(await rows("select *,to_jsonb(contributions)->>'updated_at' as version from public.contributions where id=$1",[pending.id]))[0];
+      await actor();await denied(close,[pending.id,merged.version,true]);
+      for(const name of ['bob','mentor']){await actor(name);assert.equal((await rows(close,[pending.id,merged.version,true]))[0].changed,false);}
+      await actor('alice');
+      const counts=(await rows("select public.get_public_progress_board(1,'') as data"))[0].data.counts;
+      assert.equal((await rows(close,[pending.id,pending.version,true]))[0].changed,false);
+      assert.equal((await rows(close,[pending.id,merged.version,true]))[0].changed,true);
+      const closed=(await rows("select *,to_jsonb(contributions)->>'updated_at' as version from public.contributions where id=$1",[pending.id]))[0];
+      assert.ok(closed.closed_at);assert.equal(closed.closed_by,ids.alice);assert.equal(closed.status,'merged');assert.equal(closed.pr_url,merged.pr_url);
+      assert.equal(closed.verifier_id,merged.verifier_id);assert.deepEqual(closed.verified_at,merged.verified_at);assert.equal(closed.verification_source,merged.verification_source);
+      assert.deepEqual((await rows("select public.get_public_progress_board(1,'') as data"))[0].data.counts,counts);
+      assert.equal((await rows("update public.contributions set pr_url='https://github.com/example/project/pull/99' where id=$1 returning id",[pending.id])).length,0);
+      assert.equal((await rows(close,[pending.id,merged.version,false]))[0].changed,false);
+      assert.equal((await rows(close,[pending.id,closed.version,true]))[0].changed,false);
+      await actor('curator');assert.equal((await rows(close,[pending.id,closed.version,false]))[0].changed,true);
+      const reopened=(await rows("select *,to_jsonb(contributions)->>'updated_at' as version from public.contributions where id=$1",[pending.id]))[0];
+      assert.equal(reopened.closed_at,null);assert.equal(reopened.closed_by,null);assert.equal(reopened.status,'merged');
+      assert.equal((await rows(close,[pending.id,reopened.version,true]))[0].changed,true);
+      await db.query("update public.contributions set status='submitted' where id=$1",[pending.id]);
+      const corrected=(await rows('select closed_at,closed_by from public.contributions where id=$1',[pending.id]))[0];assert.deepEqual(corrected,{closed_at:null,closed_by:null});
+    });
     await suite.test("private helpers have fixed search paths and trigger functions are not client-callable", async () => {
       await admin();
       const functions = await rows("select proname, proconfig from pg_proc where pronamespace='private'::regnamespace");

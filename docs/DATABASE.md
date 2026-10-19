@@ -161,3 +161,8 @@ Before a hosted pilot, repeat the access checks through a real Supabase developm
 ## Automatic GitHub merge completion
 
 `20261019001654_automatic_github_merge_completion.sql` adds private contribution audit columns and an RLS-enabled `private.github_merge_checks` throttle ledger. The three public merge RPCs are service-role-only invoker wrappers; private definer helpers check trusted OAuth provider identity, target repository, exact PR URL and row version under locks. Participant grants are unchanged, and curator corrections retain their actor-derived audit. Automatic completions use `verification_source=github`, a null human verifier and real GitHub merge/PR/author IDs. Existing counts include these merged records without widening the public projection. The ledger does not touch contribution versions. See [CONTRIBUTIONS.md](CONTRIBUTIONS.md) for invocation timing, failure behavior and Edge deployment.
+
+
+## Completed contribution closure
+
+`20261019004423_close_completed_contributions.sql` adds `closed_at` and `closed_by` to contributions. Closure is allowed only for merged records, and the pair is either both null or both non-null. Authenticated owners/curators use the invoker `set_contribution_closed` wrapper and a private definer helper with explicit actor/ownership/role checks, an authorized row lock and expected version. Time and actor come from the guard trigger. Existing column grants and UPDATE RLS policies are unchanged; no direct client closure/audit writes are granted. Status, verification and public counts remain merged. Curator status corrections clear closure when the record is no longer merged. See [CONTRIBUTIONS.md](CONTRIBUTIONS.md).
