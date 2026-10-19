@@ -41,6 +41,7 @@ let helpMode='normal';
 let contributionMode='normal';
 let progressMode='normal';
 const githubReads = new Map();
+let autoMergeReady=false;
 const id = '30000000-0000-4000-8000-000000000001';
 const otherId = '30000000-0000-4000-8000-000000000002';
 const curatorId='30000000-0000-4000-8000-000000000003';
@@ -97,7 +98,9 @@ http.createServer(async (req, res) => {
     });return reply(result.rows[0].data);
   }
   if(url.pathname==='/auto-merge-control') {
+    autoMergeReady=url.searchParams.get('merged')==='true';
     await directoryDb.transaction(async tx=>{await tx.exec('reset role');
+      await tx.query("update private.github_merge_checks set checked_at=clock_timestamp()-interval '6 minutes' where contribution_id in (select id from public.contributions where participant_id=$1)",[evidenceId]);
       await tx.query("delete from auth.identities where user_id=$1",[evidenceId]);
       await tx.query("insert into auth.identities(user_id,provider,provider_id) values($1,'github','777')",[evidenceId]);
       await tx.query("update public.opportunities set repository_url='https://github.com/firstpr-fixture/client' where title='[DEMO] Documentation task 2'");
@@ -121,8 +124,8 @@ http.createServer(async (req, res) => {
     if(number==='906') return reply({message:'Fictional request limit'},429);
     if(number==='907') return reply({message:'Fictional outage'},500);
     return reply({html_url:`https://github.com/${owner}/${repo}/pull/${number}`,
-      id:888,merged_at:number==='904'?'2026-10-18T21:00:00Z':null,title:'[DEMO] Improve the contribution guide',state:['903','904'].includes(number)?'closed':'open',
-      draft:number==='902',merged:number==='904',user:{login:'fixture-contributor',id:777},
+      id:888,merged_at:(number==='904'||(number==='950'&&autoMergeReady))?'2026-10-18T21:00:00Z':null,title:'[DEMO] Improve the contribution guide',state:(['903','904'].includes(number)||(number==='950'&&autoMergeReady))?'closed':'open',
+      draft:number==='902',merged:number==='904'||(number==='950'&&autoMergeReady),user:{login:'fixture-contributor',id:777},
       base:{repo:{private:number==='908',full_name:`${owner}/${repo}`}},
       comments:number==='902'?0:3,review_comments:number==='902'?0:2,updated_at:'2026-10-18T21:00:00Z'});
   }

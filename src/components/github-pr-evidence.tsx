@@ -7,8 +7,8 @@ import { readPullRequest } from "@/lib/github/pull-request";
 // or raw GitHub responses. Consent/ownership are checked before rendering this component.
 const cachedEvidence = unstable_cache(
   (url: string, token?: string) => readPullRequest(url, fetch, token),
-  ["public-github-pr-evidence-v1"],
-  { revalidate: 300 },
+  ["public-github-pr-evidence-v2"],
+  { revalidate: 300, tags: ["github-pr-evidence"] },
 );
 
 const unavailable = {

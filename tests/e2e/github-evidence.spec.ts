@@ -76,10 +76,15 @@ test('matching merged PR is automatically done with GitHub audit and dashboard/p
   await expect(page).toHaveURL(/\/dashboard$/);
   const {task}=await(await request.get(stub+'/task-control?fixture=2')).json();
   await page.goto(`/contributions/new?opportunity=${task}`);
-  await page.getByLabel('GitHub pull-request URL',{exact:true}).fill('https://github.com/firstpr-fixture/client/pull/904');
+  await page.getByLabel('GitHub pull-request URL',{exact:true}).fill('https://github.com/firstpr-fixture/client/pull/950');
   await page.getByRole('button',{name:'Submit pull request',exact:true}).click();
   await expect(page).toHaveURL(/\/contributions\?sent=1$/);
+  await expect(page.locator('.help-status')).toHaveText('submitted');
+  await expect(page.locator('[data-github-evidence]')).toHaveAttribute('data-github-evidence','open');
+  await request.get(stub+'/auto-merge-control?merged=true');
+  await page.reload();
   await expect(page.locator('.help-status')).toHaveText('merged');
+  await expect(page.locator('[data-github-evidence]')).toHaveAttribute('data-github-evidence','merged');
   await expect(page.getByText('Done — this contribution has been merged.',{exact:true})).toBeVisible();
   await expect(page.locator('.verification-audit')).toContainText('Automatically verified by GitHub');
   await expect(page.getByRole('button',{name:'Save PR link',exact:true})).toHaveCount(0);

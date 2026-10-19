@@ -1,6 +1,6 @@
 "use server";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfig } from "@/lib/supabase/config";
 import { curatorContext } from "@/lib/curator/data";
@@ -13,7 +13,7 @@ export async function syncMyContributions() {
   const {data,error} = await supabase.auth.getUser();
   if(error || !data.user) return {completed:0,unavailable:true};
   const result = await syncUserMerges(supabase);
-  if(result.completed > 0) refresh();
+  if(result.completed > 0) { updateTag("github-pr-evidence"); refresh(); }
   return result;
 }
 export async function saveContribution(_previous:ContributionState,form:FormData):Promise<ContributionState> {
@@ -37,7 +37,8 @@ export async function saveContribution(_previous:ContributionState,form:FormData
       if(error)return {error:"Your PR could not be saved. Your link is still here; try again."};
     }
     // A failed external check never discards a successfully saved link.
-    await syncUserMerges(supabase).catch(() => undefined);
+    const synced = await syncUserMerges(supabase).catch(() => undefined);
+    if(synced && synced.completed > 0) updateTag("github-pr-evidence");
   } catch {return {error:"We could not reach the submission service. Your link is still here; try again."};}
   refresh();revalidatePath(`/opportunities/${opportunity_id}`);
   if(!contribution_id)redirect("/contributions?sent=1");
