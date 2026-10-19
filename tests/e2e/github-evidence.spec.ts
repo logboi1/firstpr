@@ -67,7 +67,8 @@ test('automatic public GitHub evidence stays distinct from curator status and re
   await visitorContext.close();
 });
 
-test('matching merged PR is automatically done with GitHub audit and dashboard/public counts',async({page,browser,request})=>{
+test('matching merged PR is automatically done with GitHub audit and dashboard/public counts',async({page,browser,request},info)=>{
+  test.setTimeout(120000);
   await request.get(stub+'/reset');await request.get(stub+'/auto-merge-control');
   await page.context().addCookies([{name:'firstpr-test-account',value:'evidence',domain:'localhost',path:'/'}]);
   await page.goto('/sign-in');await page.getByRole('button',{name:'Continue with GitHub',exact:true}).click();
@@ -88,6 +89,43 @@ test('matching merged PR is automatically done with GitHub audit and dashboard/p
   await expect(page.getByText('Done — this contribution has been merged.',{exact:true})).toBeVisible();
   await expect(page.locator('.verification-audit')).toContainText('Automatically verified by GitHub');
   await expect(page.getByRole('button',{name:'Save PR link',exact:true})).toHaveCount(0);
+  const stale=await page.context().newPage();await stale.goto('/contributions');
+  await expect(stale.getByRole('button',{name:'Close contribution',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Close contribution',exact:true}).click();
+  await expect(page).toHaveURL(/view=closed&notice=closed/);
+  await expect(page.locator('.closure-status')).toHaveText('Closed in FirstPR');
+  await page.setViewportSize({width:320,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  const closureScan=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
+  await info.attach('closed-contribution-axe.json',{body:JSON.stringify(closureScan,null,2),contentType:'application/json'});
+  expect(closureScan.violations).toEqual([]);
+  await info.attach('closed-contribution-mobile.png',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});
+  await expect(page.locator('.help-status')).toHaveText('merged');
+  await expect(page.locator('.verification-audit')).toContainText('Automatically verified by GitHub');
+  await stale.getByRole('button',{name:'Close contribution',exact:true}).click();
+  await expect(stale.getByRole('alert').filter({hasText:'This contribution changed'})).toBeVisible();
+  await page.goto('/contributions');await expect(page.locator('.help-request')).toHaveCount(0);
+  await page.getByLabel('Contribution view',{exact:true}).selectOption('closed');
+  await page.getByRole('button',{name:'Filter submissions',exact:true}).click();
+  await expect(page.locator('.closure-status')).toBeVisible();await page.reload();
+  await expect(page.locator('.closure-status')).toBeVisible();
+  await page.getByLabel('Contribution view',{exact:true}).selectOption('all');
+  await page.getByRole('button',{name:'Filter submissions',exact:true}).click();
+  await expect(page.locator('.help-request')).toHaveCount(1);
+  await page.getByRole('button',{name:'Reopen contribution',exact:true}).click();
+  await expect(page).toHaveURL(/view=active&notice=reopened/);
+  await expect(page.locator('.closure-status')).toHaveCount(0);
+  await expect(page.locator('.help-status')).toHaveText('merged');
+  const curatorContext=await browser.newContext();const curator=await curatorContext.newPage();
+  await curatorContext.addCookies([{name:'firstpr-test-account',value:'curator',domain:'localhost',path:'/'}]);
+  await curator.goto('/sign-in');await curator.getByRole('button',{name:'Continue with GitHub',exact:true}).click();
+  await curator.getByLabel('Display name',{exact:true}).fill('Closure curator');
+  await curator.getByRole('button',{name:'Save and continue',exact:true}).click();
+  await expect(curator).toHaveURL(/\/dashboard$/);
+  await curator.goto('/admin/contributions');
+  await curator.getByRole('button',{name:'Close contribution',exact:true}).click();
+  await expect(curator).toHaveURL(/\/admin\/contributions\?view=closed&notice=closed/);
+  await expect(curator.locator('.closure-status')).toBeVisible();
   await page.goto('/dashboard');await expect(page.locator('.progress-stats [data-status="merged"] dd')).toHaveText('1');
   await page.getByRole('button',{name:'Join public progress',exact:true}).click();
   await expect(page.getByRole('button',{name:'Make my progress private',exact:true})).toBeVisible();
@@ -97,5 +135,5 @@ test('matching merged PR is automatically done with GitHub audit and dashboard/p
   await page.getByRole('button',{name:'Make my progress private',exact:true}).click();
   await expect(page.getByRole('button',{name:'Join public progress',exact:true})).toBeVisible();
   await visitor.reload();await expect(visitor.locator('.public-contribution')).toHaveCount(0);
-  await visitorContext.close();
+  await visitorContext.close();await curatorContext.close();
 });

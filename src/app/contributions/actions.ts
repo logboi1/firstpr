@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseConfig } from "@/lib/supabase/config";
 import { curatorContext } from "@/lib/curator/data";
 import { syncUserMerges } from "@/lib/contributions/sync";
-import { contributionInput,reviewInput,type ContributionState } from "@/lib/contributions/validation";
+import { contributionInput,reviewInput,closureInput,type ContributionState } from "@/lib/contributions/validation";
 function refresh() {revalidatePath("/contributions");revalidatePath("/admin/contributions");revalidatePath("/dashboard");revalidatePath("/progress");}
 export async function syncMyContributions() {
   if (!supabaseConfig()) return {completed:0,unavailable:true};
@@ -58,4 +58,21 @@ export async function verifyContribution(_previous:ContributionState,form:FormDa
     if(error||!data?.length)return {error:"This submission changed, is your own, or is unavailable. Refresh and check the PR again."};
   } catch {return {error:"The verification could not be saved. Try again."};}
   refresh();return {message:parsed.data.status==="submitted"?"Returned to submitted; verification audit cleared.":"Manual verification recorded."};
+}
+
+export async function setContributionClosure(_previous:ContributionState,form:FormData):Promise<ContributionState> {
+  const parsed=closureInput.safeParse(Object.fromEntries(form));
+  if(!parsed.success)return {error:parsed.error.issues[0].message};
+  const {contribution_id,expected_updated_at,closed,scope}=parsed.data;
+  try {
+    if(!supabaseConfig())return {error:"Sign in to manage this contribution."};
+    const supabase=await createClient();const {data:auth,error:authError}=await supabase.auth.getUser();
+    if(authError||!auth.user)return {error:"Your session has expired. Sign in again."};
+    if(scope==="curator" && !(await curatorContext())?.allowed)return {error:"Curator access is required."};
+    const {data,error}=await supabase.rpc("set_contribution_closed",{wanted:contribution_id,expected_version:expected_updated_at,closed:closed==="true"});
+    if(error||data!==true)return {error:"This contribution changed, is not merged, or is unavailable. Refresh before trying again."};
+  } catch {return {error:"The contribution could not be updated. Try again."};}
+  refresh();
+  const base=scope==="curator"?"/admin/contributions":"/contributions";
+  redirect(`${base}?view=${closed==="true"?"closed":"active"}&notice=${closed==="true"?"closed":"reopened"}`);
 }

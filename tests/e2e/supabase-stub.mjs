@@ -172,6 +172,11 @@ http.createServer(async (req, res) => {
     }
     progressMode=url.searchParams.get('mode')||'normal';return reply({ok:true});
   }
+  if(url.pathname==='/rest/v1/rpc/set_contribution_closed') {
+    const actor=tokenSubject(req);if(!actor)return reply({message:'Unauthenticated'},401);
+    try {const {rows}=await asActor(actor,'select public.set_contribution_closed($1,$2,$3) as data',[body.wanted,body.expected_version,body.closed]);return reply(rows[0].data);}
+    catch(error){return reply({message:error.message,code:error.code},403);}
+  }
   if(url.pathname==='/contribution-control') {contributionMode=url.searchParams.get('mode')||'normal';return reply({ok:true});}
   if(url.pathname==='/rest/v1/contributions') {
     const actor=tokenSubject(req);if(!actor)return reply({message:'Unauthenticated'},401);
@@ -184,13 +189,13 @@ http.createServer(async (req, res) => {
         const operation=Object.hasOwn(body,'pr_url') ? ["update public.contributions set pr_url=$1 where id=$2 and participant_id=$3 and opportunity_id=$4 and status='submitted' and updated_at=$5::timestamptz returning id",[body.pr_url,wanted,owner,url.searchParams.get('opportunity_id')?.replace(/^eq\./,''),version]] : ["update public.contributions set status=$1 where id=$2 and participant_id<>$3 and updated_at=$4::timestamptz and status<>$1 returning id",[body.status,wanted,owner,version]];
         const {rows}=await asActor(actor,...operation);return reply(rows);
       }
-      const status=url.searchParams.get('status')?.replace(/^eq\./,'')||null;const offset=Number(url.searchParams.get('offset')||0);const limit=Number(url.searchParams.get('limit')||20);
-      const {rows}=await asActor(actor,`select c.id,c.opportunity_id,c.participant_id,c.pr_url,c.status,c.verifier_id,c.verification_source,to_jsonb(c)->>'github_merged_at' as github_merged_at,to_jsonb(c)->>'verified_at' as verified_at,to_jsonb(c)->>'created_at' as created_at,to_jsonb(c)->>'updated_at' as updated_at,
+      const status=url.searchParams.get('status')?.replace(/^eq\./,'')||null;const closure=url.searchParams.get('closed_at')||null;const offset=Number(url.searchParams.get('offset')||0);const limit=Number(url.searchParams.get('limit')||20);
+      const {rows}=await asActor(actor,`select c.id,c.opportunity_id,c.participant_id,c.pr_url,c.status,c.verifier_id,c.verification_source,to_jsonb(c)->>'closed_at' as closed_at,to_jsonb(c)->>'github_merged_at' as github_merged_at,to_jsonb(c)->>'verified_at' as verified_at,to_jsonb(c)->>'created_at' as created_at,to_jsonb(c)->>'updated_at' as updated_at,
         case when o.id is null then null else jsonb_build_object('title',o.title) end as opportunities
         from public.contributions c left join public.opportunities o on o.id=c.opportunity_id
-        where ($1::uuid is null or c.participant_id=$1) and ($2::text is null or c.status::text=$2)
-        order by c.created_at desc,c.id desc limit $3 offset $4`,[owner||null,status,limit,offset]);
-      const total=(await asActor(actor,'select count(*)::int as total from public.contributions where ($1::uuid is null or participant_id=$1) and ($2::text is null or status::text=$2)',[owner||null,status])).rows[0].total;
+        where ($1::uuid is null or c.participant_id=$1) and ($2::text is null or c.status::text=$2) and ($5::text is null or ($5='is.null' and c.closed_at is null) or ($5='not.is.null' and c.closed_at is not null))
+        order by c.created_at desc,c.id desc limit $3 offset $4`,[owner||null,status,limit,offset,closure]);
+      const total=(await asActor(actor,"select count(*)::int as total from public.contributions where ($1::uuid is null or participant_id=$1) and ($2::text is null or status::text=$2) and ($3::text is null or ($3='is.null' and closed_at is null) or ($3='not.is.null' and closed_at is not null))",[owner||null,status,closure])).rows[0].total;
       res.writeHead(200,{'content-type':'application/json','content-range':`${offset}-${offset+rows.length-1}/${total}`});return res.end(JSON.stringify(rows));
     } catch(error){return reply({message:error.message,code:error.code},403);}
   }

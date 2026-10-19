@@ -34,3 +34,8 @@ Tests cover owner isolation for participant/mentor/curator views, archived-task 
 ### Public GitHub evidence
 
 Opted-in public cards also show automatically fetched public GitHub PR title, author, target repository, state and discussion/code-review comment counts. Consent is queried on every board request before these cards render; opting out hides both the contribution and its GitHub evidence from subsequent board requests. The public RPC projection remains unchanged. Display evidence has a five-minute cache. The trusted merge worker can separately persist matching GitHub completions, which update totals and filters; see [CONTRIBUTIONS.md](CONTRIBUTIONS.md). Public GitHub authorship is displayed as evidence, not assumed to match the FirstPR submitter.
+
+
+### Closing completed work
+
+Participants and curators can close/reopen merged submissions in FirstPR's contribution lists. This only organizes the private work queue; dashboard and public merged counts continue including those contributions. Workflow closure does not opt a participant out of public progress, and no closure actor/time is included in the public projection.
