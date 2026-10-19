@@ -1,5 +1,10 @@
 project_id = "firstpr"
 
+# The handler validates every user JWT with Supabase Auth before service RPCs.
+# The legacy gateway JWT check does not support rotated asymmetric signing keys.
+[functions.sync-github-merges]
+verify_jwt = false
+
 [api]
 enabled = true
 schemas = ["public", "graphql_public"]

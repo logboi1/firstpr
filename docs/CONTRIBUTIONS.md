@@ -55,8 +55,10 @@ Checks run after a successful PR save, on the participant dashboard/contribution
 ### Deploy
 
 1. Apply the checked-in additive migration after database tests.
-2. Deploy `sync-github-merges` with JWT verification enabled: `supabase functions deploy sync-github-merges`. Its `deno.json` pins the existing Zod dependency; the bundle also needs the shared worker, `src/lib/github/pull-request.ts` and `src/lib/contributions/validation.ts`.
-3. Supabase supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` within the Edge runtime. No service secret belongs in Next.js or the browser. Optional `GITHUB_PUBLIC_READ_TOKEN` must also be set as a Supabase Edge secret if higher GitHub API limits are needed; the Next.js environment setting alone does not configure the worker.
+2. Deploy `sync-github-merges` with the checked-in function configuration: `supabase functions deploy sync-github-merges`. Its `deno.json` pins the existing Zod dependency; the bundle also needs the shared worker, `src/lib/github/pull-request.ts` and `src/lib/contributions/validation.ts`.
+3. The handler validates every caller’s user JWT using Supabase Auth before invoking privileged RPCs. The legacy gateway JWT check is disabled to support asymmetric signing keys. Supabase supplies the project URL and API keys within the Edge runtime; the worker prefers the new publishable/secret key maps and falls back to legacy anon/service-role keys. Secret keys are sent only on the apikey header, never as bearer JWTs. No service secret belongs in Next.js or the browser. Optional `GITHUB_PUBLIC_READ_TOKEN` must also be set as a Supabase Edge secret if higher GitHub API limits are needed; the Next.js environment setting alone does not configure the worker.
 4. Merge/deploy the app and verify with a real participant session. Private/missing PRs, unmatched accounts/repositories, incomplete provider evidence, and API failures remain available for curator review.
 
 The Edge handler and authorization checks are tested against the same disposable database fixture used by browser tests. Hosted OAuth success is a separate pilot check; do not impersonate a participant to test it.
+
+References for the function’s session check and key handling: [Supabase signing keys](https://supabase.com/docs/guides/auth/signing-keys) and [API-key migration](https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys).

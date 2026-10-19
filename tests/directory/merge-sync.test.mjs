@@ -55,3 +55,14 @@ test('failed storage writes and concurrent false results never report completion
   const result=await handler(request());assert.equal(result.status,status);if(status===200)assert.equal((await result.json()).completed,0);
  }
 });
+
+test('modern secret keys stay on apikey headers while the participant JWT is validated by Auth',async()=>{
+ const modern={...env,SUPABASE_ANON_KEY:'sb_publishable_fixture',SUPABASE_SERVICE_ROLE_KEY:'sb_secret_fixture'};
+ let privileged=0;
+ const handler=createMergeHandler(modern,async(url,init)=>{
+  if(url.endsWith('/auth/v1/user')){assert.equal(init.headers.apikey,'sb_publishable_fixture');assert.equal(init.headers.Authorization,'Bearer participant-session');return response({id:actor});}
+  privileged++;assert.equal(init.headers.apikey,'sb_secret_fixture');assert.equal(init.headers.Authorization,undefined);
+  return response([]);
+ });
+ assert.equal((await handler(request())).status,200);assert.equal(privileged,1);
+});

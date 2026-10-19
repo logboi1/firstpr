@@ -18,7 +18,9 @@ export function createMergeHandler(env, fetcher = fetch) {
       if (typeof user.id !== 'string' || !/^[a-f0-9-]{36}$/i.test(user.id)) return reply({error:'Sign in required'},401);
       const rpc = async (name, body) => {
         const result = await fetcher(`${env.SUPABASE_URL}/rest/v1/rpc/${name}`, {
-          method:'POST', headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json'},
+          method:'POST', headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,
+            ...(env.SUPABASE_SERVICE_ROLE_KEY.startsWith('sb_secret_') ? {} : {Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`}),
+            'Content-Type':'application/json'},
           body:JSON.stringify(body),signal:AbortSignal.timeout(5000),
         });
         if(!result.ok) throw new Error('Sync storage unavailable');
