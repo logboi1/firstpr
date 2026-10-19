@@ -76,7 +76,16 @@ http.createServer(async (req, res) => {
   let text = ''; for await (const part of req) text += part;
   const body = text ? JSON.parse(text) : {};
   const reply = (data, status=200) => {res.writeHead(status, {'content-type':'application/json'});res.end(JSON.stringify(data));};
-  if(url.pathname==='/github-control') return reply(Object.fromEntries(githubReads));
+  if(url.pathname==='/github-control') {
+    if(url.searchParams.get('cleanup')==='true') {
+      // Curator lists span all actors, so remove this spec's submissions even
+      // after a failed assertion. This endpoint exists only in the disposable fixture.
+      await directoryDb.transaction(async tx=>{await tx.exec('reset role');
+        await tx.query('delete from public.contributions where participant_id=$1',[evidenceId]);
+      });
+    }
+    return reply(Object.fromEntries(githubReads));
+  }
   if(url.pathname.startsWith('/github-pr/')) {
     const [, ,owner,repo,number]=url.pathname.split('/');
     const key=`${owner}/${repo}/${number}`;

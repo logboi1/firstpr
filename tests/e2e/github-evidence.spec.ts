@@ -1,6 +1,9 @@
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 const stub='http://localhost:54329';
+test.afterEach(async({request})=>{
+  expect((await request.get(stub+'/github-control?cleanup=true')).ok()).toBe(true);
+});
 
 test('automatic public GitHub evidence stays distinct from curator status and respects public consent',async({page,browser,request},info)=>{
   test.setTimeout(180000);
