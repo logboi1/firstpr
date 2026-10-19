@@ -6,6 +6,8 @@ test("GitHub sign-in, onboarding, refresh, own profile editing, logout and stale
   page,
   context,
 }) => {
+  await page.goto('/');
+  await expect(page.getByRole('link', {name:'Sign in', exact:true})).toBeVisible();
   for (const route of ["/dashboard", "/profile", "/onboarding"]) {
     await page.goto(route);
     await expect(page).toHaveURL(/\/sign-in$/);
@@ -31,6 +33,11 @@ test("GitHub sign-in, onboarding, refresh, own profile editing, logout and stale
   await expect(
     page.getByRole("heading", { name: "Welcome, Ada." }),
   ).toBeVisible();
+  for (const route of ['/', '/opportunities', '/progress']) {
+    await page.goto(route);
+    await expect(page.locator('header').getByRole('link', {name:'Dashboard', exact:true})).toBeVisible();
+    await expect(page.getByRole('link', {name:'Sign in', exact:true})).toHaveCount(0);
+  }
   await page.goto("/sign-in");
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto("/onboarding");
@@ -70,6 +77,8 @@ test("GitHub sign-in, onboarding, refresh, own profile editing, logout and stale
   );
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/sign-in$/);
+  await page.goto('/');
+  await expect(page.getByRole('link', {name:'Sign in', exact:true})).toBeVisible();
 });
 test("expired cookie session is refreshed and persisted on the response", async ({
   page,
@@ -94,7 +103,10 @@ test("expired cookie session is refreshed and persisted on the response", async 
         "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url"),
     },
   ]);
-  await page.reload();
+  await page.goto('/');
+  await expect(page.getByRole('link', {name:'Dashboard', exact:true})).toBeVisible();
+  await expect(page.getByRole('link', {name:'Sign in', exact:true})).toHaveCount(0);
+  await page.getByRole('link', {name:'Dashboard', exact:true}).click();
   await expect(page).toHaveURL(/\/onboarding$/);
   const stats = await (
     await request.get("http://localhost:54329/stats")

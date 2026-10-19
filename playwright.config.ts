@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 const fixtureEnv = {
   NEXT_PUBLIC_SUPABASE_URL: 'http://localhost:54329',
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key',
+  NODE_OPTIONS: '--import ./tests/e2e/github-fetch-fixture.mjs',
 };
 export default defineConfig({
   testDir: './tests/e2e',
