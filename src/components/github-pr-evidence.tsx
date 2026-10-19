@@ -7,8 +7,8 @@ import { readPullRequest } from "@/lib/github/pull-request";
 // or raw GitHub responses. Consent/ownership are checked before rendering this component.
 const cachedEvidence = unstable_cache(
   (url: string, token?: string) => readPullRequest(url, fetch, token),
-  ["public-github-pr-evidence-v1"],
-  { revalidate: 300 },
+  ["public-github-pr-evidence-v2"],
+  { revalidate: 300, tags: ["github-pr-evidence"] },
 );
 
 const unavailable = {
@@ -27,7 +27,7 @@ async function Evidence({ url }: { url: string }) {
     <p className="github-pr-title"><strong>{evidence.title}</strong></p>
     <dl className="github-facts"><div><dt>GitHub author</dt><dd><a href={`https://github.com/${evidence.author}`} target="_blank" rel="noopener noreferrer">@{evidence.author} ↗</a></dd></div><div><dt>Target repository</dt><dd>{evidence.repository}</dd></div><div><dt>Discussion comments</dt><dd>{evidence.comments}</dd></div><div><dt>Code review comments</dt><dd>{evidence.reviewComments}</dd></div></dl>
     <p className="field-hint">GitHub updated <time dateTime={evidence.updatedAt}>{evidence.updatedAt.replace("T", " ").slice(0, 16)} UTC</time>. GitHub snapshot <time dateTime={evidence.checkedAt}>{evidence.checkedAt.replace("T", " ").slice(0, 16)} UTC</time>; refreshes on visits with a 5-minute cache.</p>
-    <p className="field-hint">Comments show activity, not approval. This check does not establish submitter ownership or task relevance. Curator decisions and board counts are recorded separately.</p>
+    <p className="field-hint">Comments show activity, not approval. Automatic completion requires a merged PR, a matching linked GitHub author and the task’s target repository. Other submissions remain available for curator review.</p>
   </div>;
 }
 

@@ -2,12 +2,14 @@ import { z } from "zod";
 import { prUrl } from "../contributions/validation.ts";
 
 const githubPr = z.object({
+  id: z.number().int().positive().safe().optional(),
   html_url: prUrl,
   title: z.string().min(1).max(1000),
   state: z.enum(["open", "closed"]),
   draft: z.boolean(),
   merged: z.boolean(),
-  user: z.object({ login: z.string().regex(/^[a-z0-9][a-z0-9-]*$/i) }),
+  user: z.object({ login: z.string().regex(/^[a-z0-9][a-z0-9-]*$/i), id: z.number().int().positive().safe().optional() }),
+  merged_at: z.string().datetime().nullable().optional(),
   base: z.object({ repo: z.object({ private: z.literal(false), full_name: z.string() }) }),
   comments: z.number().int().nonnegative(),
   review_comments: z.number().int().nonnegative(),
@@ -17,7 +19,8 @@ const githubPr = z.object({
 export type PullRequestEvidence =
   | { kind: "found"; title: string; author: string; repository: string;
       state: "open" | "draft" | "merged" | "closed";
-      comments: number; reviewComments: number; updatedAt: string; checkedAt: string }
+      comments: number; reviewComments: number; updatedAt: string; checkedAt: string;
+      mergeProof?: { authorId: string; prId: string; mergedAt: string } }
   | { kind: "unavailable"; reason: "not-public" | "rate-limit" | "network" | "invalid" };
 
 // Only canonical github.com URLs are accepted; never follow a submitted URL or API redirect.
@@ -58,6 +61,8 @@ export async function readPullRequest(
       comments: pr.comments, reviewComments: pr.review_comments,
       updatedAt: pr.updated_at, checkedAt: Number.isNaN(Date.parse(response.headers.get("date") ?? ""))
         ? new Date().toISOString() : new Date(response.headers.get("date")!).toISOString(),
+      ...(pr.merged && pr.state === "closed" && pr.id && pr.user.id && pr.merged_at
+        ? { mergeProof: { authorId: String(pr.user.id), prId: String(pr.id), mergedAt: pr.merged_at } } : {}),
     };
   } catch {
     return { kind: "unavailable", reason: "network" };

@@ -36,6 +36,7 @@ test("FirstPR migration and database access boundaries", async (suite) => {
     create role authenticated nologin;
     create role service_role nologin bypassrls;
     create schema auth;
+  create table auth.identities(user_id uuid,provider text,provider_id text);
     create table auth.users(id uuid primary key, raw_user_meta_data jsonb default '{}');
     create function auth.uid() returns uuid language sql stable as $$
       select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
@@ -608,6 +609,41 @@ test("FirstPR migration and database access boundaries", async (suite) => {
       assert.equal(first.total,before+13);assert.equal(first.items.length,12);assert.equal(last.page,last.pages);assert.ok(last.items.length<=12);
       assert.equal(new Set([...first.items,...last.items].map(task=>task.id)).size,first.items.length+last.items.length);
       await admin();await db.query('delete from public.opportunity_participations where opportunity_id=any($1::uuid[])',[tasks]);await db.query('delete from public.opportunities where id=any($1::uuid[])',[tasks]);
+    });
+    await suite.test("trusted GitHub merges require matching identity/repository/version and keep participant writes denied", async () => {
+      await admin();
+      const task='10000000-0000-4000-8000-000000000099';
+      await db.query("insert into public.opportunities(id,title,summary,skills,contribution_type,difficulty,repository_url,issue_url,setup_notes,status) values($1,'Auto merge fixture','Auto merge fixture',ARRAY['React'],'code','beginner','https://github.com/example/project','https://github.com/example/project/issues/1','Run tests','published')",[task]);
+      await db.query("insert into auth.identities(user_id,provider,provider_id) values($1,'github','777')",[ids.alice]);
+      await actor('alice');
+      const item=(await rows("insert into public.contributions(opportunity_id,pr_url) values($1,'https://github.com/example/project/pull/42') returning id,pr_url,to_jsonb(contributions)->>'updated_at' as updated_at",[task]))[0];
+      const query='select public.complete_github_merge($1,$2,$3,$4,$5,$6,$7) as done';
+      const args=[item.id,item.pr_url,item.updated_at,'777','example/project','888','2026-10-18T21:00:00Z'];
+      await denied(query,args);
+      await denied('select public.github_merge_candidates($1)',[ids.alice]);
+      await denied('select public.note_github_merge_check($1,$2,$3)',[item.id,item.pr_url,item.updated_at]);
+      await denied('select * from private.github_merge_checks');
+      await denied("update public.contributions set status='merged' where id=$1",[item.id]);
+      await denied("update public.contributions set verification_source='github' where id=$1",[item.id]);
+      await actor();await denied(query,args);
+      await admin();await db.exec('set role service_role');
+      const candidates=(await rows('select public.github_merge_candidates($1) as data',[ids.alice]))[0].data;
+      assert.ok(candidates.some(x=>x.id===item.id));
+      await rows('select public.note_github_merge_check($1,$2,$3)',[item.id,item.pr_url,item.updated_at]);
+      assert.equal((await rows('select public.github_merge_candidates($1) as data',[ids.alice]))[0].data.some(x=>x.id===item.id),false);
+      for(const changes of [{3:'999'},{4:'another/project'},{1:'https://github.com/example/project/pull/43'},{2:'2020-01-01T00:00:00Z'},{5:null}]){
+        const altered=[...args];for(const [key,value] of Object.entries(changes))altered[Number(key)]=value;
+        assert.equal((await rows(query,altered))[0].done,false);
+      }
+      assert.equal((await rows(query,args))[0].done,true);
+      assert.equal((await rows(query,args))[0].done,false);
+      await actor('alice');const saved=(await rows('select * from public.contributions where id=$1',[item.id]))[0];
+      assert.equal(saved.status,'merged');assert.equal(saved.verification_source,'github');assert.equal(saved.verifier_id,null);assert.ok(saved.verified_at);assert.equal(saved.github_author_id,'777');
+      assert.equal((await rows("update public.contributions set pr_url='https://github.com/example/project/pull/43' where id=$1 returning id",[item.id])).length,0);
+      const mine=(await rows('select public.get_participant_dashboard(1) as data'))[0].data;assert.ok(mine.contributions.merged>=1);
+      await actor('curator');await db.query("update public.contributions set status='submitted' where id=$1",[item.id]);
+      const corrected=(await rows('select * from public.contributions where id=$1',[item.id]))[0];
+      assert.equal(corrected.verification_source,null);assert.equal(corrected.github_pr_id,null);assert.equal(corrected.github_merged_at,null);
     });
     await suite.test("private helpers have fixed search paths and trigger functions are not client-callable", async () => {
       await admin();

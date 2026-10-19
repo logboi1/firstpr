@@ -1,10 +1,12 @@
 // Disposable contract stub. Never connects to Supabase or sends email.
 import http from 'node:http';
+import { createMergeHandler } from '../../supabase/functions/_shared/merge-sync.mjs';
 import { PGlite } from '@electric-sql/pglite';
 import { readdirSync, readFileSync } from 'node:fs';
 const directoryDb = new PGlite();
 await directoryDb.exec(`
-  create role anon nologin; create role authenticated nologin; create schema auth;
+  create role service_role nologin bypassrls; create role anon nologin; create role authenticated nologin; create schema auth;
+  create table auth.identities(user_id uuid,provider text,provider_id text);
   create table auth.users(id uuid primary key);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
   grant usage on schema auth,public to anon,authenticated;
@@ -39,6 +41,7 @@ let helpMode='normal';
 let contributionMode='normal';
 let progressMode='normal';
 const githubReads = new Map();
+let autoMergeReady=false;
 const id = '30000000-0000-4000-8000-000000000001';
 const otherId = '30000000-0000-4000-8000-000000000002';
 const curatorId='30000000-0000-4000-8000-000000000003';
@@ -76,6 +79,33 @@ http.createServer(async (req, res) => {
   let text = ''; for await (const part of req) text += part;
   const body = text ? JSON.parse(text) : {};
   const reply = (data, status=200) => {res.writeHead(status, {'content-type':'application/json'});res.end(JSON.stringify(data));};
+  if(url.pathname==='/functions/v1/sync-github-merges') {
+    const handler=createMergeHandler({SUPABASE_URL:'http://localhost:54329',SUPABASE_ANON_KEY:'fixture-anon',SUPABASE_SERVICE_ROLE_KEY:'fixture-service'},async(input,init)=>{
+      const target=new URL(input);
+      if(target.hostname==='api.github.com')return fetch('http://localhost:54329/github-pr/'+target.pathname.replace('/repos/','').replace('/pulls/','/'),init);
+      return fetch(input,init);
+    });
+    const result=await handler(new Request('http://localhost:54329'+url.pathname,{method:'POST',headers:req.headers,body:'{}'}));
+    return reply(await result.json(),result.status);
+  }
+  if(['/rest/v1/rpc/github_merge_candidates','/rest/v1/rpc/complete_github_merge','/rest/v1/rpc/note_github_merge_check'].includes(url.pathname)) {
+    if(req.headers.authorization!=='Bearer fixture-service') return reply({message:'Denied'},403);
+    const result=await directoryDb.transaction(async tx=>{await tx.exec('set local role service_role');
+      return url.pathname.endsWith('github_merge_candidates')
+        ? tx.query('select public.github_merge_candidates($1) as data',[body.actor])
+        : url.pathname.endsWith('note_github_merge_check') ? tx.query('select public.note_github_merge_check($1,$2,$3) as data',[body.wanted,body.expected_url,body.expected_version])
+        : tx.query('select public.complete_github_merge($1,$2,$3,$4,$5,$6,$7) as data',[body.wanted,body.expected_url,body.expected_version,body.author_id,body.repository,body.pr_id,body.merged_at]);
+    });return reply(result.rows[0].data);
+  }
+  if(url.pathname==='/auto-merge-control') {
+    autoMergeReady=url.searchParams.get('merged')==='true';
+    await directoryDb.transaction(async tx=>{await tx.exec('reset role');
+      await tx.query("update private.github_merge_checks set checked_at=clock_timestamp()-interval '6 minutes' where contribution_id in (select id from public.contributions where participant_id=$1)",[evidenceId]);
+      await tx.query("delete from auth.identities where user_id=$1",[evidenceId]);
+      await tx.query("insert into auth.identities(user_id,provider,provider_id) values($1,'github','777')",[evidenceId]);
+      await tx.query("update public.opportunities set repository_url='https://github.com/firstpr-fixture/client' where title='[DEMO] Documentation task 2'");
+    });return reply({ok:true});
+  }
   if(url.pathname==='/github-control') {
     if(url.searchParams.get('cleanup')==='true') {
       // Curator lists span all actors, so remove this spec's submissions even
@@ -94,8 +124,8 @@ http.createServer(async (req, res) => {
     if(number==='906') return reply({message:'Fictional request limit'},429);
     if(number==='907') return reply({message:'Fictional outage'},500);
     return reply({html_url:`https://github.com/${owner}/${repo}/pull/${number}`,
-      title:'[DEMO] Improve the contribution guide',state:['903','904'].includes(number)?'closed':'open',
-      draft:number==='902',merged:number==='904',user:{login:'fixture-contributor'},
+      id:888,merged_at:(number==='904'||(number==='950'&&autoMergeReady))?'2026-10-18T21:00:00Z':null,title:'[DEMO] Improve the contribution guide',state:(['903','904'].includes(number)||(number==='950'&&autoMergeReady))?'closed':'open',
+      draft:number==='902',merged:number==='904'||(number==='950'&&autoMergeReady),user:{login:'fixture-contributor',id:777},
       base:{repo:{private:number==='908',full_name:`${owner}/${repo}`}},
       comments:number==='902'?0:3,review_comments:number==='902'?0:2,updated_at:'2026-10-18T21:00:00Z'});
   }
@@ -155,7 +185,7 @@ http.createServer(async (req, res) => {
         const {rows}=await asActor(actor,...operation);return reply(rows);
       }
       const status=url.searchParams.get('status')?.replace(/^eq\./,'')||null;const offset=Number(url.searchParams.get('offset')||0);const limit=Number(url.searchParams.get('limit')||20);
-      const {rows}=await asActor(actor,`select c.id,c.opportunity_id,c.participant_id,c.pr_url,c.status,c.verifier_id,to_jsonb(c)->>'verified_at' as verified_at,to_jsonb(c)->>'created_at' as created_at,to_jsonb(c)->>'updated_at' as updated_at,
+      const {rows}=await asActor(actor,`select c.id,c.opportunity_id,c.participant_id,c.pr_url,c.status,c.verifier_id,c.verification_source,to_jsonb(c)->>'github_merged_at' as github_merged_at,to_jsonb(c)->>'verified_at' as verified_at,to_jsonb(c)->>'created_at' as created_at,to_jsonb(c)->>'updated_at' as updated_at,
         case when o.id is null then null else jsonb_build_object('title',o.title) end as opportunities
         from public.contributions c left join public.opportunities o on o.id=c.opportunity_id
         where ($1::uuid is null or c.participant_id=$1) and ($2::text is null or c.status::text=$2)
