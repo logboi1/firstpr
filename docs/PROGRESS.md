@@ -14,7 +14,7 @@ Task checklists and help text are not made public by the visibility setting. The
 
 `get_public_progress_board(page_number,status_filter)` exposes only four fields per entry: display name, PR URL, recorded status, and submission date. It reads only participants whose current `public_board_consent` is true. The page shows separate submitted, merged and closed counts across all consented records, independent of page and selected status filter. The matching total and pagination apply the selected filter. There are 20 entries per page, ordered by submission date and internal ID; internal IDs never enter the response.
 
-This is a recent feed, not a ranking. There are no points, leaderboards or per-person scores. “Merged” and “closed” are manually recorded curator decisions; the board does not contact GitHub or automatically synchronize external state. Closed means closed without merging.
+This is a recent feed, not a ranking. There are no points, leaderboards or per-person scores. “Merged” and “closed” are manually recorded curator decisions; automatic public GitHub evidence appears separately and does not overwrite these decisions. Closed means closed without merging.
 
 The public RPC uses narrowly scoped definer access because visitors cannot SELECT private profiles or contributions. It has a fixed empty search path, no user-ID parameter, no mutations, and explicit execute grants to anon/authenticated only. Direct anonymous access to private tables remains denied. Runtime schemas reject unexpected fields in the public projection. The original narrow `get_public_progress(page_size)` RPC remains compatible.
 
@@ -29,3 +29,8 @@ The public page is dynamically rendered with a no-store response. Counts and ent
 `20261015132144_participant_progress.sql` adds the two RPCs, without new tables, users, role grants or sample data. Verify it first in a disposable database; apply through the project's migration workflow. The public definer function is intentionally an exposed projection, not an escape from private-table RLS.
 
 Tests cover owner isolation for participant/mentor/curator views, archived-task continuation, bounded task and public pagination, consent withdrawal, exact public field projection, global counts with status filtering, and direct-table access denial. Browser coverage uses real migrations in the disposable contract server, with actual per-role SQL and profile consent updates, and checks the dashboard/checklist/help/PR journey, manual merge status, separate accounts, failed consent saves, forged owner IDs, profile consent, no-store responses, mobile overflow, error recovery, and expired sessions. Real-provider session and deployment validation remain pilot checks.
+
+
+### Public GitHub evidence
+
+Opted-in public cards also show automatically fetched public GitHub PR title, author, target repository, state and discussion/code-review comment counts. Consent is queried on every board request before these cards render; opting out hides both the contribution and its GitHub evidence from subsequent board requests. The public RPC projection remains unchanged. Evidence has a five-minute cache and does not alter curator-recorded totals or status filters; see [CONTRIBUTIONS.md](CONTRIBUTIONS.md). Public GitHub authorship is displayed as evidence, not assumed to match the FirstPR submitter.

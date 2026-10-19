@@ -29,3 +29,8 @@ Profile updates derive the owner ID from the validated user, allow only display 
 - CI runs the browser contract tests separately and retains native PostgreSQL authorization tests.
 
 Before pilot release, test real GitHub OAuth, token expiry, provider outages, and account isolation in a dedicated Supabase project. Contract tests verify the app integration, not Supabase's implementation or production deployment.
+
+
+### Session-aware navigation
+
+The homepage and public site header share a server-rendered account link. A user validated with `auth.getUser()` sees **Dashboard**, while a guest sees **Sign in**. The pending fallback says **Checking session…** so authenticated users are not briefly prompted to sign in. The homepage participates in the session-refresh proxy and returns private/no-store caching headers, preserving refreshed cookies. On a thrown provider/network failure, the control offers **My account** rather than asserting the user is signed out. Protected pages and mutations retain their own server authorization checks; the navigation link is not an access control.

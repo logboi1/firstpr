@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SessionLink } from "@/components/session-link";
 import { Brand } from "@/components/brand";
 import { SiteFooter } from "@/components/site-chrome";
 
@@ -10,7 +11,7 @@ const steps = [
 ];
 export default function Home() {
   return <>
-    <header className="site-header"><div className="shell header"><div className="brand-lockup"><Brand/><span className="brand-caption">the open-source workshop</span></div><nav className="site-navigation" aria-label="Main navigation"><Link href="/opportunities">Find a task</Link><Link href="/progress">Public progress</Link><a className="github-link" href={repository}>GitHub <span aria-hidden="true">↗</span></a><Link className="nav-signin" href="/sign-in">Sign in <span aria-hidden="true">→</span></Link></nav></div></header>
+    <header className="site-header"><div className="shell header"><div className="brand-lockup"><Brand/><span className="brand-caption">the open-source workshop</span></div><nav className="site-navigation" aria-label="Main navigation"><Link href="/opportunities">Find a task</Link><Link href="/progress">Public progress</Link><a className="github-link" href={repository}>GitHub <span aria-hidden="true">↗</span></a><SessionLink/></nav></div></header>
     <main id="main" tabIndex={-1}>
       <section className="shell hero" aria-labelledby="hero-title">
         <div className="hero-copy"><p className="eyebrow"><span className="status-dot" aria-hidden="true"/> GOOD PEOPLE. SMALL PULL REQUESTS.</p><h1 id="hero-title">Big things start<br/>with a <span className="highlight-word">small PR.</span></h1><p className="intro">You don’t need to know everything to contribute. Find your first task, get a little guidance, and make something better. Together.</p><div className="actions"><Link className="button primary" href="/opportunities">Find your first task <span aria-hidden="true">↗</span></Link><a className="text-link" href="#how-it-works">How it works <span aria-hidden="true">↓</span></a></div><div className="hero-footnote"><span className="tiny-branch" aria-hidden="true">↳</span><p>New to open source? You’re in the right place.<br/><span>Documentation, design, testing, and code welcome.</span></p></div></div>

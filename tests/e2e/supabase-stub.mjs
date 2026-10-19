@@ -23,7 +23,7 @@ await directoryDb.exec(`
     'https://example.invalid/ui','https://example.invalid/ui/issues/1','Fictional setup','published'),
     ('[DEMO] Secret draft','Not public',ARRAY['DraftOnly'],'code','beginner','https://example.invalid/draft','https://example.invalid/draft/1','','draft'),
     ('[DEMO] Archived task','Not public',ARRAY['ArchivedOnly'],'code','beginner','https://example.invalid/archive','https://example.invalid/archive/1','Fictional setup','archived');
-  insert into auth.users(id) values ('30000000-0000-4000-8000-000000000001'),('30000000-0000-4000-8000-000000000002'),('30000000-0000-4000-8000-000000000003'),('30000000-0000-4000-8000-000000000004'),('30000000-0000-4000-8000-000000000005'),('30000000-0000-4000-8000-000000000006');
+  insert into auth.users(id) values ('30000000-0000-4000-8000-000000000001'),('30000000-0000-4000-8000-000000000002'),('30000000-0000-4000-8000-000000000003'),('30000000-0000-4000-8000-000000000004'),('30000000-0000-4000-8000-000000000005'),('30000000-0000-4000-8000-000000000006'),('30000000-0000-4000-8000-000000000007');
   insert into public.user_roles(user_id,role) values ('30000000-0000-4000-8000-000000000003','curator');
   insert into public.user_roles(user_id,role) values ('30000000-0000-4000-8000-000000000004','mentor'),('30000000-0000-4000-8000-000000000005','mentor');
   update public.opportunities set prerequisites='Read the fictional contribution guide',setup_notes=E'Install dependencies\nRun the tests' where title='[DEMO] Documentation task 1';
@@ -38,13 +38,15 @@ let directoryWaiters = [];
 let helpMode='normal';
 let contributionMode='normal';
 let progressMode='normal';
+const githubReads = new Map();
 const id = '30000000-0000-4000-8000-000000000001';
 const otherId = '30000000-0000-4000-8000-000000000002';
 const curatorId='30000000-0000-4000-8000-000000000003';
 const mentorId='30000000-0000-4000-8000-000000000004';
 const secondMentorId='30000000-0000-4000-8000-000000000005';
 const journeyId='30000000-0000-4000-8000-000000000006';
-const users = Object.fromEntries([[journeyId,'journey@example.com'],[id,'ada@example.com'],[otherId,'bob@example.com'],[curatorId,'curator@example.com'],[mentorId,'mentor@example.com'],[secondMentorId,'mentor-two@example.com']].map(([id,email])=>[id,{id,aud:'authenticated',role:'authenticated',email,app_metadata:{},user_metadata:{},created_at:'2026-10-14T00:00:00Z'}]));
+const evidenceId='30000000-0000-4000-8000-000000000007';
+const users = Object.fromEntries([[evidenceId,'evidence@example.com'],[journeyId,'journey@example.com'],[id,'ada@example.com'],[otherId,'bob@example.com'],[curatorId,'curator@example.com'],[mentorId,'mentor@example.com'],[secondMentorId,'mentor-two@example.com']].map(([id,email])=>[id,{id,aud:'authenticated',role:'authenticated',email,app_metadata:{},user_metadata:{},created_at:'2026-10-14T00:00:00Z'}]));
 const defaultProfile = { display_name:'New contributor',skills:[],experience:'beginner',public_board_consent:false,onboarding_completed:false };
 let profiles = Object.fromEntries(Object.keys(users).map(id=>[id,{...defaultProfile,id}]));
 let refreshes=0;
@@ -74,6 +76,29 @@ http.createServer(async (req, res) => {
   let text = ''; for await (const part of req) text += part;
   const body = text ? JSON.parse(text) : {};
   const reply = (data, status=200) => {res.writeHead(status, {'content-type':'application/json'});res.end(JSON.stringify(data));};
+  if(url.pathname==='/github-control') {
+    if(url.searchParams.get('cleanup')==='true') {
+      // Curator lists span all actors, so remove this spec's submissions even
+      // after a failed assertion. This endpoint exists only in the disposable fixture.
+      await directoryDb.transaction(async tx=>{await tx.exec('reset role');
+        await tx.query('delete from public.contributions where participant_id=$1',[evidenceId]);
+      });
+    }
+    return reply(Object.fromEntries(githubReads));
+  }
+  if(url.pathname.startsWith('/github-pr/')) {
+    const [, ,owner,repo,number]=url.pathname.split('/');
+    const key=`${owner}/${repo}/${number}`;
+    githubReads.set(key,(githubReads.get(key)||0)+1);
+    if(number==='905') return reply({message:'Fictional missing PR'},404);
+    if(number==='906') return reply({message:'Fictional request limit'},429);
+    if(number==='907') return reply({message:'Fictional outage'},500);
+    return reply({html_url:`https://github.com/${owner}/${repo}/pull/${number}`,
+      title:'[DEMO] Improve the contribution guide',state:['903','904'].includes(number)?'closed':'open',
+      draft:number==='902',merged:number==='904',user:{login:'fixture-contributor'},
+      base:{repo:{private:number==='908',full_name:`${owner}/${repo}`}},
+      comments:number==='902'?0:3,review_comments:number==='902'?0:2,updated_at:'2026-10-18T21:00:00Z'});
+  }
   if(url.pathname==='/curator-control') {
     await directoryDb.transaction(async tx=>{await tx.exec('reset role');
       if(url.searchParams.get('enabled')==='false') await tx.query("delete from public.user_roles where user_id=$1 and role='curator'",[curatorId]);
@@ -198,7 +223,7 @@ http.createServer(async (req, res) => {
     const redirectTo=url.searchParams.get('redirect_to');
     if(!redirectTo) return reply({message:'Missing redirect URL'},400);
     const account=req.headers.cookie?.match(/(?:^|; )firstpr-test-account=([^;]+)/)?.[1];
-    const subject=account==='journey' ? journeyId : account==='mentor' ? mentorId : account==='mentor-two' ? secondMentorId : account==='curator' ? curatorId : account==='bob' ? otherId : id;
+    const subject=account==='evidence' ? evidenceId : account==='journey' ? journeyId : account==='mentor' ? mentorId : account==='mentor-two' ? secondMentorId : account==='curator' ? curatorId : account==='bob' ? otherId : id;
     const destination=new URL(redirectTo);
     destination.searchParams.set('code',subject);
     res.writeHead(302,{location:destination.toString()});return res.end();
